@@ -20,7 +20,8 @@ class TemporalShift(nn.Module):
         print('=> Using fold div: {}'.format(self.fold_div))
 
     def forward(self, x):
-        x = self.shift(x, self.n_segment, fold_div=self.fold_div, inplace=self.inplace)
+        x = self.shift(x, self.n_segment, fold_div=self.fold_div,
+                       inplace=self.inplace)
         return self.net(x)
 
     @staticmethod
@@ -31,14 +32,15 @@ class TemporalShift(nn.Module):
 
         fold = c // fold_div
         if inplace:
-            # Due to some out of order error when performing parallel computing. 
+            # Due to some out of order error when performing parallel computing.
             # May need to write a CUDA kernel.
-            raise NotImplementedError  
+            raise NotImplementedError
             # out = InplaceShift.apply(x, fold)
         else:
             out = torch.zeros_like(x)
             out[:, :-1, :fold] = x[:, 1:, :fold]  # shift left
-            out[:, 1:, fold: 2 * fold] = x[:, :-1, fold: 2 * fold]  # shift right
+            out[:, 1:, fold: 2 * fold] = x[:, :-
+                                           1, fold: 2 * fold]  # shift right
             out[:, :, 2 * fold:] = x[:, :, 2 * fold:]  # not shift
 
         return out.view(nt, c, h, w)
@@ -88,15 +90,20 @@ class TemporalPool(nn.Module):
     def temporal_pool(x, n_segment):
         nt, c, h, w = x.size()
         n_batch = nt // n_segment
-        x = x.view(n_batch, n_segment, c, h, w).transpose(1, 2)  # n, c, t, h, w
-        x = F.max_pool3d(x, kernel_size=(3, 1, 1), stride=(2, 1, 1), padding=(1, 0, 0))
+        x = x.view(n_batch, n_segment, c, h, w).transpose(
+            1, 2)  # n, c, t, h, w
+        x = F.max_pool3d(x, kernel_size=(3, 1, 1),
+                         stride=(2, 1, 1), padding=(1, 0, 0))
         x = x.transpose(1, 2).contiguous().view(nt // 2, c, h, w)
         return x
 
 
-def make_temporal_shift(net, n_segment, n_div=8, place='blockres', temporal_pool=False):
+def make_temporal_shift(net, n_segment, n_div=8,
+                        place='blockres',
+                        temporal_pool=False):
     if temporal_pool:
-        n_segment_list = [n_segment, n_segment // 2, n_segment // 2, n_segment // 2]
+        n_segment_list = [n_segment, n_segment //
+                          2, n_segment // 2, n_segment // 2]
     else:
         n_segment_list = [n_segment] * 4
     assert n_segment_list[-1] > 0
@@ -109,7 +116,8 @@ def make_temporal_shift(net, n_segment, n_div=8, place='blockres', temporal_pool
                 blocks = list(stage.children())
                 print('=> Processing stage with {} blocks'.format(len(blocks)))
                 for i, b in enumerate(blocks):
-                    blocks[i] = TemporalShift(b, n_segment=this_segment, n_div=n_div)
+                    blocks[i] = TemporalShift(
+                        b, n_segment=this_segment, n_div=n_div)
                 return nn.Sequential(*(blocks))
 
             net.layer1 = make_block_temporal(net.layer1, n_segment_list[0])
@@ -128,7 +136,8 @@ def make_temporal_shift(net, n_segment, n_div=8, place='blockres', temporal_pool
                 print('=> Processing stage with {} blocks residual'.format(len(blocks)))
                 for i, b in enumerate(blocks):
                     if i % n_round == 0:
-                        blocks[i].conv1 = TemporalShift(b.conv1, n_segment=this_segment, n_div=n_div)
+                        blocks[i].conv1 = TemporalShift(
+                            b.conv1, n_segment=this_segment, n_div=n_div)
                 return nn.Sequential(*blocks)
 
             net.layer1 = make_block_temporal(net.layer1, n_segment_list[0])
@@ -197,7 +206,3 @@ if __name__ == '__main__':
             grad2 = torch.autograd.grad((y2 ** 2).mean(), [x2])[0]
             assert torch.norm(grad1 - grad2).item() < 1e-5
     print('Test passed.')
-
-
-
-

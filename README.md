@@ -21,19 +21,22 @@ We release the PyTorch code of the [Temporal Shift Module](https://arxiv.org/abs
 
 ## Content
 
-- [Prerequisites](#prerequisites)
-- [Data Preparation](#data-preparation)
-- [Code](#code)
-- [Pretrained Models](#pretrained-models)
-  * [Kinetics-400](#kinetics-400)
-    + [Dense Sample](#dense-sample)
-    + [Unifrom Sampling](#unifrom-sampling)
-  * [Something-Something](#something-something)
-    + [Something-Something-V1](#something-something-v1)
-    + [Something-Something-V2](#something-something-v2)
-- [Testing](#testing)
-- [Training](#training)
-- [Live Demo on NVIDIA Jetson Nano](#live-demo-on-nvidia-jetson-nano)
++ [TSM: Temporal Shift Module for Efficient Video Understanding [Website] [arXiv][Demo]](#tsm-temporal-shift-module-for-efficient-video-understanding-website-arxiv)
+  + [Overview](#overview)
+  + [Content](#content)
+  + [Prerequisites](#prerequisites)
+  + [Data Preparation](#data-preparation)
+  + [Code](#code)
+  + [Pretrained Models](#pretrained-models)
+    + [Kinetics-400](#kinetics-400)
+      + [Dense Sample](#dense-sample)
+      + [Unifrom Sampling](#unifrom-sampling)
+    + [Something-Something](#something-something)
+        + [Something-Something-V1](#something-something-v1)
+      + [Something-Something-V2](#something-something-v2)
+  + [Testing](#testing)
+  + [Training](#training)
+  + [Live Demo on NVIDIA Jetson Nano](#live-demo-on-nvidia-jetson-nano)
 
 ## Prerequisites
 

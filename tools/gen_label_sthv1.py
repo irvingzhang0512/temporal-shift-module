@@ -9,23 +9,38 @@
 import os
 
 if __name__ == '__main__':
-    dataset_name = 'something-something-v1'  # 'jester-v1'
-    with open('%s-labels.csv' % dataset_name) as f:
+    dataset_name = 'something-something-v1'
+    dataset_name = 'jester-v1'
+
+    label_root_path = '/hdd02/zhangyiyang/data/%s/label' % dataset_name
+    output_path = "/hdd02/zhangyiyang/data/%s" % dataset_name
+    img_path = "/hdd02/zhangyiyang/data/%s/20bn-jester-v1" % dataset_name
+
+    label_path = os.path.join(label_root_path, '%s-labels.csv' % dataset_name)
+    category_path = os.path.join(output_path, 'category.txt')
+    files_input = [
+        os.path.join(label_root_path, '%s-validation.csv' % dataset_name),
+        os.path.join(label_root_path, '%s-train.csv' % dataset_name)
+    ]
+    files_output = [
+        os.path.join(output_path, 'val_videofolder.txt'),
+        os.path.join(output_path, 'train_videofolder.txt'),
+    ]
+
+    with open(label_path) as f:
         lines = f.readlines()
     categories = []
     for line in lines:
         line = line.rstrip()
         categories.append(line)
     categories = sorted(categories)
-    with open('category.txt', 'w') as f:
+    with open(category_path, 'w') as f:
         f.write('\n'.join(categories))
 
     dict_categories = {}
     for i, category in enumerate(categories):
         dict_categories[category] = i
 
-    files_input = ['%s-validation.csv' % dataset_name, '%s-train.csv' % dataset_name]
-    files_output = ['val_videofolder.txt', 'train_videofolder.txt']
     for (filename_input, filename_output) in zip(files_input, files_output):
         with open(filename_input) as f:
             lines = f.readlines()
@@ -41,8 +56,9 @@ if __name__ == '__main__':
             curFolder = folders[i]
             curIDX = idx_categories[i]
             # counting the number of frames in each video folders
-            dir_files = os.listdir(os.path.join('../img', curFolder))
-            output.append('%s %d %d' % ('something/v1/img/' + curFolder, len(dir_files), curIDX))
+            dir_path = os.path.join(img_path, curFolder)
+            dir_files = os.listdir(dir_path)
+            output.append('%s %d %d' % (dir_path, len(dir_files), curIDX))
             print('%d/%d' % (i, len(folders)))
         with open(filename_output, 'w') as f:
             f.write('\n'.join(output))

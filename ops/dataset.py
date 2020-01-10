@@ -62,7 +62,8 @@ class TSNDataSet(data.Dataset):
             try:
                 return [Image.open(os.path.join(self.root_path, directory, self.image_tmpl.format(idx))).convert('RGB')]
             except Exception:
-                print('error loading image:', os.path.join(self.root_path, directory, self.image_tmpl.format(idx)))
+                print('error loading image:', os.path.join(
+                    self.root_path, directory, self.image_tmpl.format(idx)))
                 return [Image.open(os.path.join(self.root_path, directory, self.image_tmpl.format(1))).convert('RGB')]
         elif self.modality == 'Flow':
             if self.image_tmpl == 'flow_{}_{:05d}.jpg':  # ucf
@@ -82,9 +83,13 @@ class TSNDataSet(data.Dataset):
                         'RGB')
                 except Exception:
                     print('error loading flow file:',
-                          os.path.join(self.root_path, directory, self.image_tmpl.format(idx)))
-                    flow = Image.open(os.path.join(self.root_path, directory, self.image_tmpl.format(1))).convert('RGB')
-                # the input flow file is RGB image with (flow_x, flow_y, blank) for each channel
+                          os.path.join(self.root_path, directory,
+                                       self.image_tmpl.format(idx)))
+                    flow = Image.open(os.path.join(
+                        self.root_path, directory,
+                        self.image_tmpl.format(1))).convert('RGB')
+                # the input flow file is RGB image with
+                # (flow_x, flow_y, blank) for each channel
                 flow_x, flow_y, _ = flow.split()
                 x_img = flow_x.convert('L')
                 y_img = flow_y.convert('L')
@@ -112,16 +117,20 @@ class TSNDataSet(data.Dataset):
         if self.dense_sample:  # i3d dense sample
             sample_pos = max(1, 1 + record.num_frames - 64)
             t_stride = 64 // self.num_segments
-            start_idx = 0 if sample_pos == 1 else np.random.randint(0, sample_pos - 1)
-            offsets = [(idx * t_stride + start_idx) % record.num_frames for idx in range(self.num_segments)]
+            start_idx = 0 if sample_pos == 1 else np.random.randint(
+                0, sample_pos - 1)
+            offsets = [(idx * t_stride + start_idx) %
+                       record.num_frames for idx in range(self.num_segments)]
             return np.array(offsets) + 1
         else:  # normal sample
-            average_duration = (record.num_frames - self.new_length + 1) // self.num_segments
+            average_duration = (record.num_frames -
+                                self.new_length + 1) // self.num_segments
             if average_duration > 0:
                 offsets = np.multiply(list(range(self.num_segments)), average_duration) + randint(average_duration,
                                                                                                   size=self.num_segments)
             elif record.num_frames > self.num_segments:
-                offsets = np.sort(randint(record.num_frames - self.new_length + 1, size=self.num_segments))
+                offsets = np.sort(
+                    randint(record.num_frames - self.new_length + 1, size=self.num_segments))
             else:
                 offsets = np.zeros((self.num_segments,))
             return offsets + 1
@@ -130,13 +139,17 @@ class TSNDataSet(data.Dataset):
         if self.dense_sample:  # i3d dense sample
             sample_pos = max(1, 1 + record.num_frames - 64)
             t_stride = 64 // self.num_segments
-            start_idx = 0 if sample_pos == 1 else np.random.randint(0, sample_pos - 1)
-            offsets = [(idx * t_stride + start_idx) % record.num_frames for idx in range(self.num_segments)]
+            start_idx = 0 if sample_pos == 1 else np.random.randint(
+                0, sample_pos - 1)
+            offsets = [(idx * t_stride + start_idx) %
+                       record.num_frames for idx in range(self.num_segments)]
             return np.array(offsets) + 1
         else:
             if record.num_frames > self.num_segments + self.new_length - 1:
-                tick = (record.num_frames - self.new_length + 1) / float(self.num_segments)
-                offsets = np.array([int(tick / 2.0 + tick * x) for x in range(self.num_segments)])
+                tick = (record.num_frames - self.new_length + 1) / \
+                    float(self.num_segments)
+                offsets = np.array([int(tick / 2.0 + tick * x)
+                                    for x in range(self.num_segments)])
             else:
                 offsets = np.zeros((self.num_segments,))
             return offsets + 1
@@ -148,18 +161,22 @@ class TSNDataSet(data.Dataset):
             start_list = np.linspace(0, sample_pos - 1, num=10, dtype=int)
             offsets = []
             for start_idx in start_list.tolist():
-                offsets += [(idx * t_stride + start_idx) % record.num_frames for idx in range(self.num_segments)]
+                offsets += [(idx * t_stride + start_idx) %
+                            record.num_frames for idx in range(self.num_segments)]
             return np.array(offsets) + 1
         elif self.twice_sample:
-            tick = (record.num_frames - self.new_length + 1) / float(self.num_segments)
+            tick = (record.num_frames - self.new_length + 1) / \
+                float(self.num_segments)
 
             offsets = np.array([int(tick / 2.0 + tick * x) for x in range(self.num_segments)] +
                                [int(tick * x) for x in range(self.num_segments)])
 
             return offsets + 1
         else:
-            tick = (record.num_frames - self.new_length + 1) / float(self.num_segments)
-            offsets = np.array([int(tick / 2.0 + tick * x) for x in range(self.num_segments)])
+            tick = (record.num_frames - self.new_length + 1) / \
+                float(self.num_segments)
+            offsets = np.array([int(tick / 2.0 + tick * x)
+                                for x in range(self.num_segments)])
             return offsets + 1
 
     def __getitem__(self, index):
@@ -171,27 +188,33 @@ class TSNDataSet(data.Dataset):
             full_path = os.path.join(self.root_path, record.path, file_name)
         elif self.image_tmpl == '{:06d}-{}_{:05d}.jpg':
             file_name = self.image_tmpl.format(int(record.path), 'x', 1)
-            full_path = os.path.join(self.root_path, '{:06d}'.format(int(record.path)), file_name)
+            full_path = os.path.join(
+                self.root_path, '{:06d}'.format(int(record.path)), file_name)
         else:
             file_name = self.image_tmpl.format(1)
             full_path = os.path.join(self.root_path, record.path, file_name)
 
         while not os.path.exists(full_path):
-            print('################## Not Found:', os.path.join(self.root_path, record.path, file_name))
+            print('################## Not Found:', os.path.join(
+                self.root_path, record.path, file_name))
             index = np.random.randint(len(self.video_list))
             record = self.video_list[index]
             if self.image_tmpl == 'flow_{}_{:05d}.jpg':
                 file_name = self.image_tmpl.format('x', 1)
-                full_path = os.path.join(self.root_path, record.path, file_name)
+                full_path = os.path.join(
+                    self.root_path, record.path, file_name)
             elif self.image_tmpl == '{:06d}-{}_{:05d}.jpg':
                 file_name = self.image_tmpl.format(int(record.path), 'x', 1)
-                full_path = os.path.join(self.root_path, '{:06d}'.format(int(record.path)), file_name)
+                full_path = os.path.join(
+                    self.root_path, '{:06d}'.format(int(record.path)), file_name)
             else:
                 file_name = self.image_tmpl.format(1)
-                full_path = os.path.join(self.root_path, record.path, file_name)
+                full_path = os.path.join(
+                    self.root_path, record.path, file_name)
 
         if not self.test_mode:
-            segment_indices = self._sample_indices(record) if self.random_shift else self._get_val_indices(record)
+            segment_indices = self._sample_indices(
+                record) if self.random_shift else self._get_val_indices(record)
         else:
             segment_indices = self._get_test_indices(record)
         return self.get(record, segment_indices)
