@@ -2,3 +2,4 @@ log/
 checkpoint/
 __pycache__/
 .vscode/
+.ipynb_checkpoints/

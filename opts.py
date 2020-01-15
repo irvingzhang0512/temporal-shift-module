@@ -12,11 +12,13 @@ parser.add_argument('--train_list', type=str, default="")
 parser.add_argument('--val_list', type=str, default="")
 parser.add_argument('--root_path', type=str, default="")
 parser.add_argument('--store_name', type=str, default="")
+
 # ========================= Model Configs ==========================
-parser.add_argument('--arch', type=str, default="BNInception")
-parser.add_argument('--num_segments', type=int, default=3)
+parser.add_argument('--arch', type=str, default="mobilenetv2")
+parser.add_argument('--num_segments', type=int, default=8)
 parser.add_argument('--consensus_type', type=str, default='avg')
 parser.add_argument('--k', type=int, default=3)
+parser.add_argument('--online', action="store_true")
 
 parser.add_argument('--dropout', '--do', default=0.5, type=float,
                     metavar='DO', help='dropout ratio (default: 0.5)')
@@ -69,6 +71,7 @@ parser.add_argument('--snapshot_pref', type=str, default="")
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
 parser.add_argument('--gpus', nargs='+', type=int, default=None)
+parser.add_argument('--gpu_devices', default="0,1,2,3", type=str)
 parser.add_argument('--flow_prefix', default="", type=str)
 parser.add_argument('--root_log', type=str, default='log')
 parser.add_argument('--root_model', type=str, default='checkpoint')

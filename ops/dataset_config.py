@@ -12,17 +12,20 @@ def return_ucf101(modality):
     filename_categories = 'UCF101/labels/classInd.txt'
     if modality == 'RGB':
         root_data = ROOT_DATASET + 'UCF101/jpg'
-        filename_imglist_train = 'UCF101/file_list/ucf101_rgb_train_split_1.txt'
+        filename_imglist_train = 'UCF101/file_list/' \
+            'ucf101_rgb_train_split_1.txt'
         filename_imglist_val = 'UCF101/file_list/ucf101_rgb_val_split_1.txt'
         prefix = 'img_{:05d}.jpg'
     elif modality == 'Flow':
         root_data = ROOT_DATASET + 'UCF101/jpg'
-        filename_imglist_train = 'UCF101/file_list/ucf101_flow_train_split_1.txt'
+        filename_imglist_train = 'UCF101/file_list/'\
+            'ucf101_flow_train_split_1.txt'
         filename_imglist_val = 'UCF101/file_list/ucf101_flow_val_split_1.txt'
         prefix = 'flow_{}_{:05d}.jpg'
     else:
         raise NotImplementedError('no such modality:' + modality)
-    return filename_categories, filename_imglist_train, filename_imglist_val, root_data, prefix
+    return filename_categories, filename_imglist_train, \
+        filename_imglist_val, root_data, prefix
 
 
 def return_hmdb51(modality):
@@ -39,7 +42,8 @@ def return_hmdb51(modality):
         prefix = 'flow_{}_{:05d}.jpg'
     else:
         raise NotImplementedError('no such modality:' + modality)
-    return filename_categories, filename_imglist_train, filename_imglist_val, root_data, prefix
+    return filename_categories, filename_imglist_train, \
+        filename_imglist_val, root_data, prefix
 
 
 def return_something(modality):
@@ -50,31 +54,36 @@ def return_something(modality):
         filename_imglist_val = 'something/v1/val_videofolder.txt'
         prefix = '{:05d}.jpg'
     elif modality == 'Flow':
-        root_data = ROOT_DATASET + 'something/v1/20bn-something-something-v1-flow'
+        root_data = ROOT_DATASET + 'something/v1/'\
+            '20bn-something-something-v1-flow'
         filename_imglist_train = 'something/v1/train_videofolder_flow.txt'
         filename_imglist_val = 'something/v1/val_videofolder_flow.txt'
         prefix = '{:06d}-{}_{:05d}.jpg'
     else:
         print('no such modality:'+modality)
         raise NotImplementedError
-    return filename_categories, filename_imglist_train, filename_imglist_val, root_data, prefix
+    return filename_categories, filename_imglist_train, \
+        filename_imglist_val, root_data, prefix
 
 
 def return_somethingv2(modality):
     filename_categories = 'something/v2/category.txt'
     if modality == 'RGB':
-        root_data = ROOT_DATASET + 'something/v2/20bn-something-something-v2-frames'
+        root_data = ROOT_DATASET + 'something/v2/'\
+            '20bn-something-something-v2-frames'
         filename_imglist_train = 'something/v2/train_videofolder.txt'
         filename_imglist_val = 'something/v2/val_videofolder.txt'
         prefix = '{:06d}.jpg'
     elif modality == 'Flow':
-        root_data = ROOT_DATASET + 'something/v2/20bn-something-something-v2-flow'
+        root_data = ROOT_DATASET + 'something/v2/'\
+            '20bn-something-something-v2-flow'
         filename_imglist_train = 'something/v2/train_videofolder_flow.txt'
         filename_imglist_val = 'something/v2/val_videofolder_flow.txt'
         prefix = '{:06d}.jpg'
     else:
         raise NotImplementedError('no such modality:'+modality)
-    return filename_categories, filename_imglist_train, filename_imglist_val, root_data, prefix
+    return filename_categories, filename_imglist_train, \
+        filename_imglist_val, root_data, prefix
 
 
 def return_jester(modality):
@@ -99,17 +108,20 @@ def return_kinetics(modality):
         prefix = 'img_{:05d}.jpg'
     else:
         raise NotImplementedError('no such modality:' + modality)
-    return filename_categories, filename_imglist_train, filename_imglist_val, root_data, prefix
+    return filename_categories, filename_imglist_train, \
+        filename_imglist_val, root_data, prefix
 
 
 def return_dataset(dataset, modality):
-    dict_single = {'jester': return_jester, 'something': return_something,
+    dict_single = {'jester': return_jester,
+                   'something': return_something,
                    'somethingv2': return_somethingv2,
-                   'ucf101': return_ucf101, 'hmdb51': return_hmdb51,
+                   'ucf101': return_ucf101,
+                   'hmdb51': return_hmdb51,
                    'kinetics': return_kinetics}
     if dataset in dict_single:
-        file_categories, file_imglist_train, file_imglist_val, root_data, prefix = dict_single[dataset](
-            modality)
+        file_categories, file_imglist_train, file_imglist_val, \
+            root_data, prefix = dict_single[dataset](modality)
     else:
         raise ValueError('Unknown dataset '+dataset)
 

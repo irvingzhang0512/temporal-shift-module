@@ -9,7 +9,7 @@ import torch
 import torchvision
 
 from ops.basic_ops import ConsensusModule
-from ops.transforms import *
+from ops.transforms import GroupMultiScaleCrop, GroupRandomHorizontalFlip
 from torch.nn.init import normal_, constant_
 
 
@@ -22,7 +22,9 @@ class TSN(nn.Module):
                  print_spec=True, pretrain='imagenet',
                  is_shift=False, shift_div=8,
                  shift_place='blockres', fc_lr5=False,
-                 temporal_pool=False, non_local=False):
+                 temporal_pool=False, non_local=False,
+                 offline=True,
+                 ):
         super(TSN, self).__init__()
         self.modality = modality
         self.num_segments = num_segments
@@ -44,6 +46,9 @@ class TSN(nn.Module):
         self.non_local = non_local
         self.print_spec = print_spec
 
+        # online/offline
+        self.offline = offline
+
         if not before_softmax and consensus_type != 'avg':
             raise ValueError("Only avg consensus can be used after Softmax")
 
@@ -53,21 +58,20 @@ class TSN(nn.Module):
             self.new_length = new_length
         if print_spec:
             print(("""
-    Initializing TSN with base model: {}.
-    TSN Configurations:
-        input_modality:     {}
-        num_segments:       {}
-        new_length:         {}
-        consensus_module:   {}
-        dropout_ratio:      {}
-        img_feature_dim:    {}
+                    Initializing TSN with base model: {}.
+                    TSN Configurations:
+                        input_modality:     {}
+                        num_segments:       {}
+                        new_length:         {}
+                        consensus_module:   {}
+                        dropout_ratio:      {}
+                        img_feature_dim:    {}
             """.format(base_model, self.modality, self.num_segments,
                        self.new_length, consensus_type,
                        self.dropout, self.img_feature_dim)))
 
         self._prepare_base_model(base_model)
-
-        feature_dim = self._prepare_tsn(num_class)
+        self._prepare_tsn(num_class)
 
         if self.modality == 'Flow':
             print("Converting the ImageNet model to a flow init model")
@@ -166,8 +170,11 @@ class TSN(nn.Module):
                             print('Adding temporal shift... {}'.format(
                                 m.use_res_connect))
                         m.conv[0] = TemporalShift(
-                            m.conv[0], n_segment=self.num_segments,
-                            n_div=self.shift_div)
+                            m.conv[0],
+                            n_segment=self.num_segments,
+                            n_div=self.shift_div,
+                            offline=self.offline,
+                        )
             if self.modality == 'Flow':
                 self.input_mean = [0.5]
                 self.input_std = [np.mean(self.input_std)]
@@ -268,7 +275,8 @@ class TSN(nn.Module):
             elif len(m._modules) == 0:
                 if len(list(m.parameters())) > 0:
                     raise ValueError(
-                        "New atomic module type: {}. Need to give it a learning policy".format(type(m)))
+                        "New atomic module type: {}. "
+                        "Need to give it a learning policy".format(type(m)))
 
         return [
             {'params': first_conv_weight,
@@ -330,7 +338,8 @@ class TSN(nn.Module):
     def _get_diff(self, input, keep_rgb=False):
         input_c = 3 if self.modality in ["RGB", "RGBDiff"] else 2
         input_view = input.view(
-            (-1, self.num_segments, self.new_length + 1, input_c,) + input.size()[2:])
+            (-1, self.num_segments,
+             self.new_length + 1, input_c,) + input.size()[2:])
         if keep_rgb:
             new_data = input_view.clone()
         else:
@@ -338,11 +347,13 @@ class TSN(nn.Module):
 
         for x in reversed(list(range(1, self.new_length + 1))):
             if keep_rgb:
-                new_data[:, :, x, :, :, :] = input_view[:, :, x,
-                                                        :, :, :] - input_view[:, :, x - 1, :, :, :]
+                new_data[:, :, x, :, :, :] = \
+                    input_view[:, :, x,
+                               :, :, :] - input_view[:, :, x - 1, :, :, :]
             else:
-                new_data[:, :, x - 1, :, :, :] = input_view[:, :,
-                                                            x, :, :, :] - input_view[:, :, x - 1, :, :, :]
+                new_data[:, :, x - 1, :, :, :] = \
+                    input_view[:, :,
+                               x, :, :, :] - input_view[:, :, x - 1, :, :, :]
 
         return new_data
 
@@ -356,7 +367,8 @@ class TSN(nn.Module):
         conv_layer = modules[first_conv_idx]
         container = modules[first_conv_idx - 1]
 
-        # modify parameters, assume the first blob contains the convolution kernels
+        # modify parameters
+        # assume the first blob contains the convolution kernels
         params = [x.clone() for x in conv_layer.parameters()]
         kernel_size = params[0].size()
         new_kernel_size = kernel_size[:1] + \
@@ -364,8 +376,11 @@ class TSN(nn.Module):
         new_kernels = params[0].data.mean(
             dim=1, keepdim=True).expand(new_kernel_size).contiguous()
 
-        new_conv = nn.Conv2d(2 * self.new_length, conv_layer.out_channels,
-                             conv_layer.kernel_size, conv_layer.stride, conv_layer.padding,
+        new_conv = nn.Conv2d(2 * self.new_length,
+                             conv_layer.out_channels,
+                             conv_layer.kernel_size,
+                             conv_layer.stride,
+                             conv_layer.padding,
                              bias=True if len(params) == 2 else False)
         new_conv.weight.data = new_kernels
         if len(params) == 2:
@@ -379,7 +394,8 @@ class TSN(nn.Module):
         if self.base_model_name == 'BNInception':
             import torch.utils.model_zoo as model_zoo
             sd = model_zoo.load_url(
-                'https://www.dropbox.com/s/35ftw2t4mxxgjae/BNInceptionFlow-ef652051.pth.tar?dl=1')
+                "https: // www.dropbox.com/s /"
+                "35ftw2t4mxxgjae/BNInceptionFlow-ef652051.pth.tar?dl=1")
             base_model.load_state_dict(sd)
             print('=> Loading pretrained Flow weight done...')
         else:
@@ -396,7 +412,8 @@ class TSN(nn.Module):
         conv_layer = modules[first_conv_idx]
         container = modules[first_conv_idx - 1]
 
-        # modify parameters, assume the first blob contains the convolution kernels
+        # modify parameters
+        # assume the first blob contains the convolution kernels
         params = [x.clone() for x in conv_layer.parameters()]
         kernel_size = params[0].size()
         if not keep_rgb:
@@ -407,8 +424,12 @@ class TSN(nn.Module):
         else:
             new_kernel_size = kernel_size[:1] + \
                 (3 * self.new_length,) + kernel_size[2:]
-            new_kernels = torch.cat((params[0].data, params[0].data.mean(dim=1, keepdim=True).expand(new_kernel_size).contiguous()),
-                                    1)
+            new_kernels = torch.cat(
+                (params[0].data,
+                 params[0].data.mean(
+                     dim=1,
+                    keepdim=True).expand(new_kernel_size).contiguous()),
+                1)
             new_kernel_size = kernel_size[:1] + \
                 (3 + 3 * self.new_length,) + kernel_size[2:]
 
@@ -442,8 +463,9 @@ class TSN(nn.Module):
                      GroupRandomHorizontalFlip(is_flow=False)])
             else:
                 print('#' * 20, 'NO FLIP!!!')
-                return torchvision.transforms.Compose(
-                    [GroupMultiScaleCrop(self.input_size, [1, .875, .75, .66])])
+                return torchvision.transforms.Compose([
+                    GroupMultiScaleCrop(self.input_size, [1, .875, .75, .66])
+                ])
         elif self.modality == 'Flow':
             return torchvision.transforms.Compose(
                 [GroupMultiScaleCrop(self.input_size, [1, .875, .75]),

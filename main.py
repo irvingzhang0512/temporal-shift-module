@@ -14,6 +14,7 @@ import torch.backends.cudnn as cudnn
 import torch.optim
 from torch.nn.utils import clip_grad_norm_
 
+
 from ops.dataset import TSNDataSet
 from ops.models import TSN
 from ops.transforms import GroupNormalize, IdentityTransform, Stack
@@ -25,7 +26,6 @@ from ops.temporal_shift import make_temporal_pool
 
 from tensorboardX import SummaryWriter
 
-# os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3"
 
 best_prec1 = 0
 
@@ -33,6 +33,7 @@ best_prec1 = 0
 def main():
     global args, best_prec1
     args = parser.parse_args()
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_devices
 
     num_class, args.train_list, args.val_list, args.root_path, prefix = \
         dataset_config.return_dataset(args.dataset, args.modality)
@@ -56,31 +57,39 @@ def main():
         args.store_name += '_nl'
     if args.suffix is not None:
         args.store_name += '_{}'.format(args.suffix)
+    if args.online:
+        args.store_name += '_online'
     print('storing name: ' + args.store_name)
 
     check_rootfolders()
 
-    model = TSN(num_class, args.num_segments, args.modality,
-                base_model=args.arch,
-                consensus_type=args.consensus_type,
-                dropout=args.dropout,
-                img_feature_dim=args.img_feature_dim,
-                partial_bn=not args.no_partialbn,
-                pretrain=args.pretrain,
-                is_shift=args.shift, shift_div=args.shift_div,
-                shift_place=args.shift_place,
-                fc_lr5=not (args.tune_from and args.dataset in args.tune_from),
-                temporal_pool=args.temporal_pool,
-                non_local=args.non_local)
+    model = TSN(
+        num_class, args.num_segments, args.modality,
+        base_model=args.arch,
+        consensus_type=args.consensus_type,
+        dropout=args.dropout,
+        img_feature_dim=args.img_feature_dim,
+        partial_bn=not args.no_partialbn,
+        pretrain=args.pretrain,
+        is_shift=args.shift, shift_div=args.shift_div,
+        shift_place=args.shift_place,
+        fc_lr5=not (args.tune_from and args.dataset in args.tune_from),
+        temporal_pool=args.temporal_pool,
+        non_local=args.non_local,
+        offline=not args.online,
+    )
 
     crop_size = model.crop_size
     scale_size = model.scale_size
     input_mean = model.input_mean
     input_std = model.input_std
     policies = model.get_optim_policies()
-    train_augmentation = model.get_augmentation(
-        flip=False if 'something' in args.dataset
-        or 'jester' in args.dataset else True)
+
+    if 'something' in args.dataset or 'jester' in args.dataset:
+        flip = False
+    else:
+        flip = True
+    train_augmentation = model.get_augmentation(flip=flip)
 
     model = torch.nn.DataParallel(model, device_ids=args.gpus).cuda()
 
