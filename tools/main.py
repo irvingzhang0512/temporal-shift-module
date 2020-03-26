@@ -4,39 +4,31 @@
 # {jilin, songhan}@mit.edu, ganchuang@csail.mit.edu
 
 import os
-import time
 import shutil
-import torchvision
-import torch
+import time
+
 import numpy as np
-import torch.nn.parallel
+import torch
 import torch.backends.cudnn as cudnn
+import torch.nn.parallel
 import torch.optim
+import torchvision
+from tensorboardX import SummaryWriter
 from torch.nn.utils import clip_grad_norm_
 
-
-from ops.dataset import TSNDataSet
-from ops.models import TSN
-from ops.transforms import GroupNormalize, IdentityTransform, Stack
-from ops.transforms import ToTorchFormatTensor, GroupScale, GroupCenterCrop
-from opts import parser
-from ops import dataset_config
-from ops.utils import AverageMeter, accuracy
-from ops.temporal_shift import make_temporal_pool
-
-from tensorboardX import SummaryWriter
-
+from tsm.dataset import TSNDataSet, dataset_config
+from tsm.dataset.transforms import (GroupCenterCrop, GroupNormalize,
+                                    GroupScale, IdentityTransform, Stack,
+                                    ToTorchFormatTensor)
+from tsm.models import TSN
+from tsm.models.temporal_shift import make_temporal_pool
+from tsm.utils.metrics_utils import AverageMeter, accuracy
+from tsm.utils.opts_utils import parser
 
 best_prec1 = 0
 
 
-def main():
-    global args, best_prec1
-    args = parser.parse_args()
-    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_devices
-
-    num_class, args.train_list, args.val_list, args.root_path, prefix = \
-        dataset_config.return_dataset(args.dataset, args.modality)
+def _get_store_name(args):
     full_arch_name = args.arch
     if args.shift:
         full_arch_name += '_shift{}_{}'.format(
@@ -60,6 +52,16 @@ def main():
     if args.online:
         args.store_name += '_online'
     print('storing name: ' + args.store_name)
+
+
+def main():
+    global args, best_prec1
+    args = parser.parse_args()
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_devices
+
+    num_class, args.train_list, args.val_list, args.root_path, prefix = \
+        dataset_config.return_dataset(args.dataset, args.modality)
+    _get_store_name(args)
 
     check_rootfolders()
 
@@ -248,7 +250,7 @@ def main():
                 'state_dict': model.state_dict(),
                 'optimizer': optimizer.state_dict(),
                 'best_prec1': best_prec1,
-            }, is_best)
+            }, is_best, model)
 
 
 def train(train_loader, model, criterion, optimizer, epoch, log, tf_writer):
@@ -381,9 +383,10 @@ def validate(val_loader, model, criterion, epoch, log=None, tf_writer=None):
     return top1.avg
 
 
-def save_checkpoint(state, is_best):
+def save_checkpoint(state, is_best, model):
     filename = '%s/%s/ckpt.pth.tar' % (args.root_model, args.store_name)
-    torch.save(state, filename)
+    # torch.save(state, filename)
+    torch.save(model, filename)
     if is_best:
         shutil.copyfile(filename, filename.replace('pth.tar', 'best.pth.tar'))
 

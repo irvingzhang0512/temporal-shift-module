@@ -3,14 +3,14 @@
 # Ji Lin*, Chuang Gan, Song Han
 # {jilin, songhan}@mit.edu, ganchuang@csail.mit.edu
 
-from torch import nn
 import numpy as np
 import torch
 import torchvision
+from torch import nn
+from torch.nn.init import constant_, normal_
 
-from ops.basic_ops import ConsensusModule
-from ops.transforms import GroupMultiScaleCrop, GroupRandomHorizontalFlip
-from torch.nn.init import normal_, constant_
+from ..dataset.transforms import GroupMultiScaleCrop, GroupRandomHorizontalFlip
+from .basic_ops import ConsensusModule
 
 
 class TSN(nn.Module):
@@ -103,6 +103,7 @@ class TSN(nn.Module):
                     nn.Dropout(p=self.dropout))
             self.new_fc = nn.Linear(feature_dim, num_class)
 
+        # 参数初始化
         std = 0.001
         if self.new_fc is None:
             normal_(getattr(self.base_model,
@@ -123,15 +124,16 @@ class TSN(nn.Module):
                 True if self.pretrain == 'imagenet' else False)
             if self.is_shift:
                 print('Adding temporal shift...')
-                from ops.temporal_shift import make_temporal_shift
-                make_temporal_shift(self.base_model, self.num_segments,
+                from .temporal_shift import make_temporal_shift
+                make_temporal_shift(self.base_model,
+                                    self.num_segments,
                                     n_div=self.shift_div,
                                     place=self.shift_place,
                                     temporal_pool=self.temporal_pool)
 
             if self.non_local:
                 print('Adding non-local module...')
-                from ops.non_local import make_non_local
+                from .non_local import make_non_local
                 make_non_local(self.base_model, self.num_segments)
 
             self.base_model.last_layer_name = 'fc'
@@ -151,7 +153,7 @@ class TSN(nn.Module):
                     [np.mean(self.input_std) * 2] * 3 * self.new_length
 
         elif base_model == 'mobilenetv2':
-            from archs.mobilenet_v2 import mobilenet_v2, InvertedResidual
+            from .archs.mobilenet_v2 import mobilenet_v2, InvertedResidual
             self.base_model = mobilenet_v2(
                 True if self.pretrain == 'imagenet' else False)
 
@@ -162,7 +164,7 @@ class TSN(nn.Module):
 
             self.base_model.avgpool = nn.AdaptiveAvgPool2d(1)
             if self.is_shift:
-                from ops.temporal_shift import TemporalShift
+                from .temporal_shift import TemporalShift
                 for m in self.base_model.modules():
                     if isinstance(m, InvertedResidual) and \
                             len(m.conv) == 8 and m.use_res_connect:
@@ -185,7 +187,7 @@ class TSN(nn.Module):
                     [np.mean(self.input_std) * 2] * 3 * self.new_length
 
         elif base_model == 'BNInception':
-            from archs.bn_inception import bninception
+            from .archs.bn_inception import bninception
             self.base_model = bninception(pretrained=self.pretrain)
             self.input_size = self.base_model.input_size
             self.input_mean = self.base_model.mean

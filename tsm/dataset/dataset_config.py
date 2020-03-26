@@ -5,7 +5,7 @@
 
 import os
 
-ROOT_DATASET = '/hdd02/zhangyiyang/data/'  # '/data/jilin/'
+ROOT_DATASET = '/ssd/zhangyiyang/data/'
 
 
 def return_ucf101(modality):

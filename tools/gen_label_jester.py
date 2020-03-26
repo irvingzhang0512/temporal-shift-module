@@ -9,22 +9,26 @@
 
 import os
 
+osj = os.path.join
+
+DATA_ROOT = "/ssd/zhangyiyang/data"
+
 if __name__ == '__main__':
-    dataset_name = 'something-something-v1'
+    dataset_name = 'jester-v1'
 
-    label_root_path = '/hdd02/zhangyiyang/data/%s/label' % dataset_name
-    output_path = "/hdd02/zhangyiyang/data/%s" % dataset_name
-    img_path = "/hdd02/zhangyiyang/data/%s/20bn-jester-v1" % dataset_name
+    label_root_path = osj(DATA_ROOT, dataset_name, 'label')
+    output_path = osj(DATA_ROOT, dataset_name)
+    img_path = osj(DATA_ROOT, dataset_name, '20bn-jester-v1')
 
-    label_path = os.path.join(label_root_path, '%s-labels.csv' % dataset_name)
-    category_path = os.path.join(output_path, 'category.txt')
+    label_path = osj(label_root_path, '%s-labels.csv' % dataset_name)
+    category_path = osj(output_path, 'category.txt')
     files_input = [
-        os.path.join(label_root_path, '%s-validation.csv' % dataset_name),
-        os.path.join(label_root_path, '%s-train.csv' % dataset_name)
+        osj(label_root_path, '%s-validation.csv' % dataset_name),
+        osj(label_root_path, '%s-train.csv' % dataset_name)
     ]
     files_output = [
-        os.path.join(output_path, 'val_videofolder.txt'),
-        os.path.join(output_path, 'train_videofolder.txt'),
+        osj(output_path, 'val_videofolder.txt'),
+        osj(output_path, 'train_videofolder.txt'),
     ]
 
     with open(label_path) as f:
@@ -56,7 +60,7 @@ if __name__ == '__main__':
             curFolder = folders[i]
             curIDX = idx_categories[i]
             # counting the number of frames in each video folders
-            dir_path = os.path.join(img_path, curFolder)
+            dir_path = osj(img_path, curFolder)
             dir_files = os.listdir(dir_path)
             output.append('%s %d %d' % (dir_path, len(dir_files), curIDX))
             print('%d/%d' % (i, len(folders)))
