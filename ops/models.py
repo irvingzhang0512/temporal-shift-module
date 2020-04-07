@@ -17,7 +17,8 @@ class TSN(nn.Module):
                  dropout=0.8, img_feature_dim=256,
                  crop_num=1, partial_bn=True, print_spec=True, pretrain='imagenet',
                  is_shift=False, shift_div=8, shift_place='blockres', fc_lr5=False,
-                 temporal_pool=False, non_local=False):
+                 temporal_pool=False, non_local=False,
+                 offline=False,):
         super(TSN, self).__init__()
         self.modality = modality
         self.num_segments = num_segments
@@ -36,6 +37,12 @@ class TSN(nn.Module):
         self.fc_lr5 = fc_lr5
         self.temporal_pool = temporal_pool
         self.non_local = non_local
+
+        self.offline = offline
+        self.print_spec = print_spec
+
+        if not offline and base_model != 'mobilenetv2':
+            raise ValueError("online mode only support base net mobilenetv2.")
 
         if not before_softmax and consensus_type != 'avg':
             raise ValueError("Only avg consensus can be used after Softmax")
@@ -143,7 +150,7 @@ class TSN(nn.Module):
                     if isinstance(m, InvertedResidual) and len(m.conv) == 8 and m.use_res_connect:
                         if self.print_spec:
                             print('Adding temporal shift... {}'.format(m.use_res_connect))
-                        m.conv[0] = TemporalShift(m.conv[0], n_segment=self.num_segments, n_div=self.shift_div)
+                        m.conv[0] = TemporalShift(m.conv[0], n_segment=self.num_segments, n_div=self.shift_div, offline=self.offline)
             if self.modality == 'Flow':
                 self.input_mean = [0.5]
                 self.input_std = [np.mean(self.input_std)]

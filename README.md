@@ -23,19 +23,24 @@ We release the PyTorch code of the [Temporal Shift Module](https://arxiv.org/abs
 
 ## Content
 
-- [Prerequisites](#prerequisites)
-- [Data Preparation](#data-preparation)
-- [Code](#code)
-- [Pretrained Models](#pretrained-models)
-  * [Kinetics-400](#kinetics-400)
-    + [Dense Sample](#dense-sample)
-    + [Unifrom Sampling](#unifrom-sampling)
-  * [Something-Something](#something-something)
-    + [Something-Something-V1](#something-something-v1)
-    + [Something-Something-V2](#something-something-v2)
-- [Testing](#testing)
-- [Training](#training)
-- [Live Demo on NVIDIA Jetson Nano](#live-demo-on-nvidia-jetson-nano)
++ [TSM: Temporal Shift Module for Efficient Video Understanding [[Website]](https://hanlab.mit.edu/projects/tsm/) [[arXiv]](https://arxiv.org/abs/1811.08383)[[Demo]](https://www.youtube.com/watch?v=0T6u7S_gq-4)](#tsm-temporal-shift-module-for-efficient-video-understanding-website-arxiv)
+  + [Overview](#overview)
+  + [Content](#content)
+  + [Prerequisites](#prerequisites)
+  + [Data Preparation](#data-preparation)
+  + [Code](#code)
+  + [Pretrained Models](#pretrained-models)
+    + [Kinetics-400](#kinetics-400)
+      + [Dense Sample](#dense-sample)
+      + [Uniform Sampling](#uniform-sampling)
+      + [Optical Flow](#optical-flow)
+    + [Something-Something](#something-something)
+        + [Something-Something-V1](#something-something-v1)
+      + [Something-Something-V2](#something-something-v2)
+  + [Testing](#testing)
+  + [Training](#training)
+  + [Live Demo on NVIDIA Jetson Nano](#live-demo-on-nvidia-jetson-nano)
+  + [Online Traning & Predict Example](#online-traning--predict-example)
 
 ## Prerequisites
 
@@ -253,3 +258,25 @@ We have build an online hand gesture recognition demo using our TSM. The model i
 - Recorded video of the live demo [[link]](https://hanlab.mit.edu/projects/tsm/#live_demo)
 - Code of the live demo and set up tutorial:  [`online_demo`](online_demo) 
 
+## Online Traning & Predict Example
++ Only support mobilenetv2 tsm model.
++ Add `--online` when using training script `main.py`.
++ Jester Training Demo
+```shell
+python main.py jester RGB \
+    --arch mobilenetv2 --num_segments 8 --consensus_type=avg \
+    --gd 20 --lr 0.02 --wd 1e-4 --lr_steps 20 40 --epochs 50 \
+    --batch-size 128 -j 16 --dropout 0.5 --eval-freq=1 \
+    --shift --shift_div=8 --shift_place=blockres --npb \
+    --online --gpus 0 1 2 3
+```
++ Jester Predict Demo
+```shell
+python online_video_demo.py \
+    --modality RGB --arch mobilenetv2 \
+    --num_segments 8 --consensus_type avg \
+    --shift --shift_div 8 --shift_place blockres --npb \
+    --input-video /path/to/input.mp4 \
+    --output-video /path/to/output.mp4 \
+    --model-ckpt-path /path/to/ckpt.pth.tar
+```
