@@ -10,13 +10,14 @@ python main.py jester RGB \
     --gd 20 --lr 0.01 --wd 1e-4 --lr_steps 20 40 --epochs 50 \
     --batch-size 64 -j 16 --dropout 0.5 --eval-freq=1 \
     --shift --shift_div=8 --shift_place=blockres --npb \
-    --gpus 0 1 2
+    --gpu_devices 0,1,2,3 --gpus 0 1 2 3
 
 python tools/main.py jester RGB \
-    --arch mobilenetv2 --num_segments 8 --consensus_type=avg \
+    --arch mobilenetv2 --num_segments 16 --consensus_type=avg \
     --gd 20 --lr 0.02 --wd 1e-4 --lr_steps 20 40 --epochs 50 \
     --batch-size 128 -j 16 --dropout 0.5 --eval-freq=1 \
     --shift --shift_div=8 --shift_place=blockres --npb \
+    --online \
     --gpu_devices 0,1,2,3 --gpus 0 1 2 3
 
 ```

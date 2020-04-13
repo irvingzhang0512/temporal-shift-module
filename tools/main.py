@@ -6,6 +6,8 @@
 import os
 import shutil
 import time
+import sys
+sys.path.append("/ssd4/zhangyiyang/temporal-shift-module")
 
 import numpy as np
 import torch
@@ -51,6 +53,8 @@ def _get_store_name(args):
         args.store_name += '_{}'.format(args.suffix)
     if args.online:
         args.store_name += '_online'
+    if args.logs_name:
+        args.store_name += '_' + args.logs_name
     print('storing name: ' + args.store_name)
 
 
@@ -385,8 +389,8 @@ def validate(val_loader, model, criterion, epoch, log=None, tf_writer=None):
 
 def save_checkpoint(state, is_best, model):
     filename = '%s/%s/ckpt.pth.tar' % (args.root_model, args.store_name)
-    # torch.save(state, filename)
-    torch.save(model, filename)
+    torch.save(state, filename)
+    # torch.save(model, filename)
     if is_best:
         shutil.copyfile(filename, filename.replace('pth.tar', 'best.pth.tar'))
 

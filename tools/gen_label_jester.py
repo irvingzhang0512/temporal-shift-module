@@ -11,7 +11,7 @@ import os
 
 osj = os.path.join
 
-DATA_ROOT = "/ssd/zhangyiyang/data"
+DATA_ROOT = "/ssd4/zhangyiyang/data"
 
 if __name__ == '__main__':
     dataset_name = 'jester-v1'
