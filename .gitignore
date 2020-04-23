@@ -1,6 +1,9 @@
 log/
 checkpoint/
 __pycache__/
+.pkl_memoize_py3/
 .vscode/
 .ipynb_checkpoints/
 data/
+test*
+*.tmp

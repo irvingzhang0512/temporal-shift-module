@@ -7,8 +7,10 @@ import os
 import threading
 
 NUM_THREADS = 100
-VIDEO_ROOT = '/ssd/video/something/v2/20bn-something-something-v2'         # Downloaded webm videos
-FRAME_ROOT = '/ssd/video/something/v2/20bn-something-something-v2-frames'  # Directory for extracted frames
+# Downloaded webm videos
+VIDEO_ROOT = '/ssd4/zhangyiyang/data/something-something-v2/20bn-something-something-v2'
+# Directory for extracted frames
+FRAME_ROOT = '/ssd4/zhangyiyang/data/something-something-v2/20bn-something-something-v2-frames'
 
 
 def split(l, n):

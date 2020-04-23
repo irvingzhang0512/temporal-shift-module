@@ -5,8 +5,8 @@
 
 import os
 import shutil
-import time
 import sys
+import time
 sys.path.append("/ssd4/zhangyiyang/temporal-shift-module")
 
 import numpy as np
@@ -26,6 +26,8 @@ from tsm.models import TSN
 from tsm.models.temporal_shift import make_temporal_pool
 from tsm.utils.metrics_utils import AverageMeter, accuracy
 from tsm.utils.opts_utils import parser
+
+
 
 best_prec1 = 0
 
@@ -63,12 +65,17 @@ def main():
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_devices
 
+    # get dataset configs
     num_class, args.train_list, args.val_list, args.root_path, prefix = \
         dataset_config.return_dataset(args.dataset, args.modality)
+
+    # get store name
     _get_store_name(args)
 
+    # create log/checkpoint folders
     check_rootfolders()
 
+    # create model
     model = TSN(
         num_class, args.num_segments, args.modality,
         base_model=args.arch,
@@ -84,6 +91,7 @@ def main():
         non_local=args.non_local,
         offline=not args.online,
     )
+    print(model)
 
     crop_size = model.crop_size
     scale_size = model.scale_size
@@ -91,19 +99,26 @@ def main():
     input_std = model.input_std
     policies = model.get_optim_policies()
 
-    if 'something' in args.dataset or 'jester' in args.dataset:
+    # set data augmentation
+    if 'something' in args.dataset \
+        or 'jester' in args.dataset \
+            or 'ar' in args.dataset:
         flip = False
     else:
         flip = True
     train_augmentation = model.get_augmentation(flip=flip)
 
+    # set parallel model
     model = torch.nn.DataParallel(model, device_ids=args.gpus).cuda()
 
+    # create optimizer
     optimizer = torch.optim.SGD(policies,
                                 args.lr,
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay)
 
+    # resume model
+    # load from exact the same model for the same dataset
     if args.resume:
         # early temporal pool so that we can load the state_dict
         if args.temporal_pool:
@@ -120,6 +135,7 @@ def main():
         else:
             print(("=> no checkpoint found at '{}'".format(args.resume)))
 
+    # load checkpoint file from other dataset
     if args.tune_from:
         print(("=> fine-tuning from '{}'".format(args.tune_from)))
         sd = torch.load(args.tune_from)
@@ -149,22 +165,21 @@ def main():
         model_dict.update(sd)
         model.load_state_dict(model_dict)
 
+    # temporal pool
     if args.temporal_pool and not args.resume:
         make_temporal_pool(model.module.base_model, args.num_segments)
 
     cudnn.benchmark = True
 
-    # Data loading code
+    # create dataset & data preprocessing
     if args.modality != 'RGBDiff':
         normalize = GroupNormalize(input_mean, input_std)
     else:
         normalize = IdentityTransform()
-
     if args.modality == 'RGB':
         data_length = 1
     elif args.modality in ['Flow', 'RGBDiff']:
         data_length = 5
-
     train_loader = torch.utils.data.DataLoader(
         TSNDataSet(
             args.root_path, args.train_list,
@@ -180,10 +195,11 @@ def main():
                     div=(args.arch not in ['BNInception', 'InceptionV3'])),
                 normalize,
             ]), dense_sample=args.dense_sample),
-        batch_size=args.batch_size, shuffle=True,
-        num_workers=args.workers, pin_memory=True,
+        batch_size=args.batch_size,
+        shuffle=True,
+        num_workers=args.workers,
+        pin_memory=True,
         drop_last=True)  # prevent something not % n_GPU
-
     val_loader = torch.utils.data.DataLoader(
         TSNDataSet(
             args.root_path, args.val_list,
@@ -254,7 +270,7 @@ def main():
                 'state_dict': model.state_dict(),
                 'optimizer': optimizer.state_dict(),
                 'best_prec1': best_prec1,
-            }, is_best, model)
+            }, is_best, model, args.save_params)
 
 
 def train(train_loader, model, criterion, optimizer, epoch, log, tf_writer):
@@ -387,10 +403,12 @@ def validate(val_loader, model, criterion, epoch, log=None, tf_writer=None):
     return top1.avg
 
 
-def save_checkpoint(state, is_best, model):
+def save_checkpoint(state, is_best, model, save_params=True):
     filename = '%s/%s/ckpt.pth.tar' % (args.root_model, args.store_name)
-    torch.save(state, filename)
-    # torch.save(model, filename)
+    if save_params:
+        torch.save(state, filename)
+    else:
+        torch.save(model, filename)
     if is_best:
         shutil.copyfile(filename, filename.replace('pth.tar', 'best.pth.tar'))
 

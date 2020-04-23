@@ -4,12 +4,13 @@
 # {jilin, songhan}@mit.edu, ganchuang@csail.mit.edu
 
 import torch
+import torchvision
 import torch.nn as nn
 import torch.nn.functional as F
 
 
 class TemporalShift(nn.Module):
-    """用于mobilenetv2以及bninception"""
+    """TSM的核心，主要任务就是将输入进行shift操作，然后运行输入的net"""
 
     def __init__(self, net,
                  n_segment=3,
@@ -23,9 +24,6 @@ class TemporalShift(nn.Module):
         self.fold_div = n_div
         self.inplace = inplace
         self.offline = offline
-        if inplace:
-            print('=> Using in-place shift...')
-        print('=> Using fold div: {}'.format(self.fold_div))
 
     def forward(self, x):
         x = self.shift(x,
@@ -54,18 +52,53 @@ class TemporalShift(nn.Module):
             # out = InplaceShift.apply(x, fold)
         else:
             out = torch.zeros_like(x)
-            out[:, :-1, :fold] = x[:, 1:, :fold]  # shift left
 
             if offline:
+                # shift left
+                out[:, :-1, :fold] = x[:, 1:, :fold]
                 # shift right
                 out[:, 1:, fold: 2*fold] = x[:, :-1, fold: 2*fold]
             else:
-                # shift left
-                out[:, :-1, fold: 2*fold] = x[:, :-1, fold: fold*2]
+                # shift right
+                out[:, 1:, :fold] = x[:, :-1, :fold]
 
             out[:, :, 2 * fold:] = x[:, :, 2 * fold:]  # not shift
 
         return out.view(nt, c, h, w)
+
+    @staticmethod
+    def shift2(x, n_segment,
+               fold_div=3,
+               inplace=False,
+               offline=True,
+               batch_size=1,):
+        nt, c, h, w = x.size()
+        x = x.view(batch_size, n_segment, c, h, w)
+
+        fold = c // fold_div
+        if inplace:
+            raise NotImplementedError
+        else:
+            out1_1 = x[:, 1:, :fold]
+            out1_2 = torch.zeros((batch_size, 1, fold, h, w), device=x.device)
+            out1 = torch.cat((out1_1, out1_2), dim=1)
+
+            if offline:
+                # shift right
+                out2_1 = torch.zeros(
+                    (batch_size, 1, fold, h, w), device=x.device)
+                out2_2 = x[:, :-1, fold:2 * fold]
+                out2 = torch.cat((out2_1, out2_2), dim=1)
+            else:
+                # shift left
+                out2_1 = x[:, :-1, fold:2 * fold]
+                out2_2 = torch.zeros(
+                    (batch_size, 1, fold, h, w), device=x.device)
+                out2 = torch.cat((out2_1, out2_2), dim=1)
+
+            out3 = x[:, :, 2*fold:]
+
+        return torch.cat((out1, out2, out3), dim=2).view(nt, c, h, w)
 
 
 class InplaceShift(torch.autograd.Function):
@@ -122,25 +155,27 @@ class TemporalPool(nn.Module):
 
 def make_temporal_shift(net, n_segment, n_div=8,
                         place='blockres',
-                        temporal_pool=False):
+                        temporal_pool=False,
+                        offline=True):
     """为resnet设计的"""
     if temporal_pool:
+        # 8, 4, 4, 4
         n_segment_list = [n_segment, n_segment //
                           2, n_segment // 2, n_segment // 2]
     else:
+        # 8, 8, 8, 8
         n_segment_list = [n_segment] * 4
     assert n_segment_list[-1] > 0
-    print('=> n_segment per stage: {}'.format(n_segment_list))
 
-    import torchvision
     if isinstance(net, torchvision.models.ResNet):
         if place == 'block':
             def make_block_temporal(stage, this_segment):
                 blocks = list(stage.children())
-                print('=> Processing stage with {} blocks'.format(len(blocks)))
                 for i, b in enumerate(blocks):
+                    # 把ResNet中每个block都替换为TemporalShift对象
                     blocks[i] = TemporalShift(
-                        b, n_segment=this_segment, n_div=n_div)
+                        b, n_segment=this_segment, n_div=n_div,
+                        offline=offline)
                 return nn.Sequential(*(blocks))
 
             net.layer1 = make_block_temporal(net.layer1, n_segment_list[0])
@@ -152,17 +187,15 @@ def make_temporal_shift(net, n_segment, n_div=8,
             n_round = 1
             if len(list(net.layer3.children())) >= 23:
                 n_round = 2
-                print('=> Using n_round {} '
-                      'to insert temporal shift'.format(n_round))
 
             def make_block_temporal(stage, this_segment):
                 blocks = list(stage.children())
-                print('=> Processing stage with {} '
-                      'blocks residual'.format(len(blocks)))
                 for i, b in enumerate(blocks):
+                    # 只替换resnet中每个block的第一个conv
                     if i % n_round == 0:
                         blocks[i].conv1 = TemporalShift(
-                            b.conv1, n_segment=this_segment, n_div=n_div)
+                            b.conv1, n_segment=this_segment, n_div=n_div,
+                            offline=offline)
                 return nn.Sequential(*blocks)
 
             net.layer1 = make_block_temporal(net.layer1, n_segment_list[0])
@@ -174,9 +207,7 @@ def make_temporal_shift(net, n_segment, n_div=8,
 
 
 def make_temporal_pool(net, n_segment):
-    import torchvision
     if isinstance(net, torchvision.models.ResNet):
-        print('=> Injecting nonlocal pooling')
         net.layer2 = TemporalPool(net.layer2, n_segment)
     else:
         raise NotImplementedError

@@ -68,9 +68,10 @@ class InvertedResidual(nn.Module):
 
 
 class InvertedResidualWithShift(nn.Module):
-    def __init__(self, inp, oup, stride, expand_ratio):
+    def __init__(self, inp, oup, stride, expand_ratio, shift_div=8):
         super(InvertedResidualWithShift, self).__init__()
         self.stride = stride
+        self.shift_div = shift_div
         assert stride in [1, 2]
 
         assert expand_ratio > 1
@@ -96,17 +97,18 @@ class InvertedResidualWithShift(nn.Module):
 
     def forward(self, x, shift_buffer):
         c = x.size(1)
-        x1, x2 = x[:, : c // 8], x[:, c // 8:]
+        x1, x2 = x[:, : c // self.shift_div], x[:, c // self.shift_div:]
         return x + self.conv(torch.cat((shift_buffer, x2), dim=1)), x1
 
 
 class MobileNetV2(nn.Module):
-    def __init__(self, n_class=1000, input_size=224, width_mult=1.):
+    def __init__(self, n_class=1000, input_size=224, width_mult=1.,
+                 shift_div=8):
         super(MobileNetV2, self).__init__()
         input_channel = 32
         last_channel = 1280
         interverted_residual_setting = [
-            # t/expand_ratio, c/output_channels, n/num_of_blocks, s/stride
+            # t, output channels, num of blocks, sride
             [1, 16, 1, 1],
             [6, 24, 2, 2],
             [6, 32, 3, 2],
@@ -117,9 +119,10 @@ class MobileNetV2(nn.Module):
         ]
 
         # building first layer
+        # first channel is always 32!
         assert input_size % 32 == 0
 
-        # input_channel = make_divisible(input_channel * width_mult)  # first channel is always 32!
+        # input_channel = make_divisible(input_channel * width_mult)
         self.last_channel = make_divisible(
             last_channel * width_mult) if width_mult > 1.0 else last_channel
 
@@ -132,16 +135,19 @@ class MobileNetV2(nn.Module):
         for t, c, n, s in interverted_residual_setting:
             output_channel = make_divisible(c * width_mult) if t > 1 else c
             for i in range(n):
-                block = InvertedResidualWithShift \
-                    if global_idx in shift_block_idx \
-                    else InvertedResidual
-                global_idx += 1
-                if i == 0:
-                    self.features.append(
-                        block(input_channel, output_channel, s, expand_ratio=t))
+                kwargs = {
+                    "inp": input_channel,
+                    "oup": output_channel,
+                    "stride": s if i == 0 else 1,
+                    "expand_ratio": t
+                }
+                if global_idx in shift_block_idx:
+                    block = InvertedResidualWithShift
+                    kwargs['shift_div']: shift_div
                 else:
-                    self.features.append(
-                        block(input_channel, output_channel, 1, expand_ratio=t))
+                    block = InvertedResidual
+                global_idx += 1
+                self.features.append(block(**kwargs))
                 input_channel = output_channel
         # building last several layers
         self.features.append(conv_1x1_bn(input_channel, self.last_channel))
@@ -202,5 +208,8 @@ if __name__ == '__main__':
                     torch.zeros([1, 20, 7, 7])]
     with torch.no_grad():
         for _ in range(10):
-            y, shift_buffer = net(x, *shift_buffer)
+            outputs = net(x, *shift_buffer)
+            y = outputs[0]
+            shift_buffer = outputs[1:]
+            print(y.shape)
             print([s.shape for s in shift_buffer])

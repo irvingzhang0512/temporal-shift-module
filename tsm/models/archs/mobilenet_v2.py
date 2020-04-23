@@ -75,7 +75,7 @@ class MobileNetV2(nn.Module):
         input_channel = 32
         last_channel = 1280
         interverted_residual_setting = [
-            # t, c, n, s
+            # t/expand_ratio, c/output_channels, n/num_of_blocks, s/stride
             [1, 16, 1, 1],
             [6, 24, 2, 2],
             [6, 32, 3, 2],
@@ -87,16 +87,23 @@ class MobileNetV2(nn.Module):
 
         # building first layer
         assert input_size % 32 == 0
-        # # first channel is always 32!
+
         # input_channel = make_divisible(input_channel * width_mult)
         self.last_channel = make_divisible(
             last_channel * width_mult) if width_mult > 1.0 else last_channel
+
+        # 第一层conv，strid=2，in channels 3, out channels input_channel
         self.features = [conv_bn(3, input_channel, 2)]
+
         # building inverted residual blocks
         for t, c, n, s in interverted_residual_setting:
             output_channel = make_divisible(c * width_mult) if t > 1 else c
+            
+            # 一共包括 n 个block
             for i in range(n):
                 if i == 0:
+                    # 第一个block与之后block区别在于stride
+                    # 之后的stride都为1，第一个stride为s
                     self.features.append(
                         block(input_channel,
                               output_channel, s,

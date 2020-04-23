@@ -184,8 +184,20 @@ class GroupFullResSample(object):
 
 class GroupMultiScaleCrop(object):
 
-    def __init__(self, input_size, scales=None,
-                 max_distort=1, fix_crop=True, more_fix_crop=True):
+    def __init__(self,
+                 input_size,
+                 scales=None,
+                 max_distort=1,
+                 fix_crop=True,
+                 more_fix_crop=True):
+        """
+        本质就是 crop + resize
+        input_size 是 resize 后的结果
+        widht/height 随机选择 self.scales 中的一种配对
+        max_distort 绝对了选中的 width/height 编号差值的最大值，即 1/.875 是可行的，1/.75 是不可行的
+        fix_crop 用于设置选择的 h/w offset 是否是从一些固定值中选择
+        more_fix_crop 用于在 fix_crop 为 True 的情况下，增加一些选择
+        """
         self.scales = scales if scales is not None else [1, .875, .75, .66]
         self.max_distort = max_distort
         self.fix_crop = fix_crop
@@ -195,13 +207,15 @@ class GroupMultiScaleCrop(object):
         self.interpolation = Image.BILINEAR
 
     def __call__(self, img_group):
-
         im_size = img_group[0].size
 
+        # 根据输入参数 crop
         crop_w, crop_h, offset_w, offset_h = self._sample_crop_size(im_size)
         crop_img_group = [img.crop(
             (offset_w, offset_h, offset_w + crop_w, offset_h + crop_h))
             for img in img_group]
+
+        # 根据输入参数 resize
         ret_img_group = [img.resize((self.input_size[0], self.input_size[1]),
                                     self.interpolation)
                          for img in crop_img_group]

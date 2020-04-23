@@ -13,6 +13,7 @@ parser.add_argument('--val_list', type=str, default="")
 parser.add_argument('--root_path', type=str, default="")
 parser.add_argument('--store_name', type=str, default="")
 parser.add_argument('--logs_name', type=str, default="default")
+parser.add_argument('--save_params', action="store_true")
 
 # ========================= Model Configs ==========================
 parser.add_argument('--arch', type=str, default="mobilenetv2")

@@ -12,19 +12,19 @@ import os
 osj = os.path.join
 
 DATA_ROOT = "/ssd4/zhangyiyang/data"
+DATASET_NAME = 'jester-v1'
 
 if __name__ == '__main__':
-    dataset_name = 'jester-v1'
 
-    label_root_path = osj(DATA_ROOT, dataset_name, 'label')
-    output_path = osj(DATA_ROOT, dataset_name)
-    img_path = osj(DATA_ROOT, dataset_name, '20bn-jester-v1')
+    label_root_path = osj(DATA_ROOT, DATASET_NAME, 'label')
+    output_path = osj(DATA_ROOT, DATASET_NAME)
+    img_path = osj(DATA_ROOT, DATASET_NAME, '20bn-jester-v1')
 
-    label_path = osj(label_root_path, '%s-labels.csv' % dataset_name)
+    label_path = osj(label_root_path, '%s-labels.csv' % DATASET_NAME)
     category_path = osj(output_path, 'category.txt')
     files_input = [
-        osj(label_root_path, '%s-validation.csv' % dataset_name),
-        osj(label_root_path, '%s-train.csv' % dataset_name)
+        osj(label_root_path, '%s-validation.csv' % DATASET_NAME),
+        osj(label_root_path, '%s-train.csv' % DATASET_NAME)
     ]
     files_output = [
         osj(output_path, 'val_videofolder.txt'),

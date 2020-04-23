@@ -106,7 +106,7 @@ class MobileNetV2(nn.Module):
         input_channel = 32
         last_channel = 1280
         interverted_residual_setting = [
-            # t/expand_ratio, c/output_channels, n/num_of_blocks, s/stride
+            # t, output channels, num of blocks, sride
             [1, 16, 1, 1],
             [6, 24, 2, 2],
             [6, 32, 3, 2],
@@ -132,16 +132,16 @@ class MobileNetV2(nn.Module):
         for t, c, n, s in interverted_residual_setting:
             output_channel = make_divisible(c * width_mult) if t > 1 else c
             for i in range(n):
-                block = InvertedResidualWithShift \
-                    if global_idx in shift_block_idx \
-                    else InvertedResidual
-                global_idx += 1
                 if i == 0:
+                    block = InvertedResidualWithShift if global_idx in shift_block_idx else InvertedResidual
                     self.features.append(
                         block(input_channel, output_channel, s, expand_ratio=t))
+                    global_idx += 1
                 else:
+                    block = InvertedResidualWithShift if global_idx in shift_block_idx else InvertedResidual
                     self.features.append(
                         block(input_channel, output_channel, 1, expand_ratio=t))
+                    global_idx += 1
                 input_channel = output_channel
         # building last several layers
         self.features.append(conv_1x1_bn(input_channel, self.last_channel))

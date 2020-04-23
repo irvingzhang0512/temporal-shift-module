@@ -123,13 +123,13 @@ class TSN(nn.Module):
             self.base_model = getattr(torchvision.models, base_model)(
                 True if self.pretrain == 'imagenet' else False)
             if self.is_shift:
-                print('Adding temporal shift...')
                 from .temporal_shift import make_temporal_shift
                 make_temporal_shift(self.base_model,
                                     self.num_segments,
                                     n_div=self.shift_div,
                                     place=self.shift_place,
-                                    temporal_pool=self.temporal_pool)
+                                    temporal_pool=self.temporal_pool,
+                                    offline=self.offline,)
 
             if self.non_local:
                 print('Adding non-local module...')
@@ -198,7 +198,6 @@ class TSN(nn.Module):
             elif self.modality == 'RGBDiff':
                 self.input_mean = self.input_mean * (1 + self.new_length)
             if self.is_shift:
-                print('Adding temporal shift...')
                 self.base_model.build_temporal_ops(
                     self.num_segments, is_temporal_shift=self.shift_place,
                     shift_div=self.shift_div)
