@@ -14,27 +14,29 @@ categories = None
 def _parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--category-file', type=str,
-                        default="/ssd4/zhangyiyang/data/jester-v1/category.txt")
+                        default="/ssd4/zhangyiyang/data/AR/category.txt")
     parser.add_argument('--online-mode', action="store_true", default=False)
+    parser.add_argument('--not-params-model', action="store_true", default=False)
     parser.add_argument('--file-name-suffix', type=str, default=None)
 
     # filter label
     parser.add_argument('--prob-threshold', type=float, default=0.5)
-    parser.add_argument('--doing-nothing-label-id', type=int, default=2)
-    parser.add_argument('--doing-other-label-id', type=int, default=0)
-    parser.add_argument('--probs-history-cumsum', type=int, default=1)
+    parser.add_argument('--doing-nothing-label-id', type=int, default=0)
+    parser.add_argument('--doing-other-label-id', type=int, default=1)
+    parser.add_argument('--probs-history-cumsum', type=int, default=4)
 
     # output
     parser.add_argument('--output-file-dir', type=str,
                         default="/ssd4/zhangyiyang/temporal-shift-module/data/output")
     parser.add_argument('--output-video-height', type=int, default=480)
     parser.add_argument('--output-video-width', type=int, default=640)
+    parser.add_argument('--output-video-flip', action="store_true", default=False)
     parser.add_argument('--show', action="store_true", default=False)
 
     # video
     parser.add_argument("--tmp-video", type=str, default="./test.avi")
     parser.add_argument('--input-video', type=str,
-                        default="/ssd4/zhangyiyang/temporal-shift-module/data/input/jester.mp4")
+                        default="/ssd4/zhangyiyang/temporal-shift-module/data/input/ar-4.mp4")
     parser.add_argument('--input-frame-interval', type=int, default=2)
     parser.add_argument('--output-video-dir', type=str,
                         default="/ssd4/zhangyiyang/temporal-shift-module/data/output")
@@ -44,7 +46,7 @@ def _parse_args():
     parser.add_argument('--online-ckpt-model',
                         action="store_true", default=False)
     parser.add_argument('--model-ckpt-path', type=str,
-                        default="/ssd4/zhangyiyang/temporal-shift-module/checkpoint/TSM_jester_RGB_mobilenetv2_shift8_blockres_avg_segment8_e50_online_shift1_4/ckpt.best.pth.tar")
+                        default="/ssd4/zhangyiyang/temporal-shift-module/checkpoint/TSM_ar_RGB_mobilenetv2_shift4_blockres_avg_segment8_e50_online_default/ckpt.best.pth.tar")
     parser.add_argument('--num-segments', type=int, default=8)
     parser.add_argument('--shift-div', type=int, default=4)
 
@@ -53,10 +55,12 @@ def _parse_args():
 
 def _draw_image(img, fps,
                 label_id, doing_nothing_label_id, prob=0.,
-                resize_shape=None,):
+                resize_shape=None, flip=True):
     if resize_shape is not None:
         img = cv2.resize(img, resize_shape)
-    img = img[:, ::-1]
+    
+    if flip:
+        img = img[:, ::-1]
     height, width, _ = img.shape
     label = np.zeros([height // 10, width, 3]).astype('uint8') + 255
 
@@ -330,7 +334,8 @@ def main(args):
     # load model
     model = load_model(args.model_ckpt_path, args,
                        online_mode=args.online_mode,
-                       online_ckpt_model=args.online_ckpt_model)
+                       online_ckpt_model=args.online_ckpt_model,
+                       params_model=not args.not_params_model,)
     print("model loaded.")
 
     # video reader
@@ -424,7 +429,7 @@ def main(args):
             target_img = _draw_image(
                 img, fps,
                 label_id, args.doing_nothing_label_id,
-                cur_prob)
+                cur_prob, flip=args.output_video_flip)
             target_img = cv2.resize(
                 target_img,
                 (args.output_video_width, args.output_video_height))

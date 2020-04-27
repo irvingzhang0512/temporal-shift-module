@@ -104,10 +104,10 @@ def return_ar(modality):
     dataset_path = opj(ROOT_DATASET, 'AR')
     category_file = opj(dataset_path, 'category.txt')
     if modality == 'RGB':
-        img_format = '{:06d}.jpg'
+        img_format = '{:05d}.jpg'
         frames_path = opj(dataset_path, 'frames')
-        train_filename = opj(dataset_path, 'train_samples.txt')
-        val_filename = opj(dataset_path, 'val_samples.txt')
+        train_filename = opj(dataset_path, 'label/train_samples.txt')
+        val_filename = opj(dataset_path, 'label/val_samples.txt')
     else:
         raise NotImplementedError('no such modality:'+modality)
     return category_file, train_filename, val_filename, \

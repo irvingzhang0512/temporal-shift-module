@@ -32,10 +32,11 @@ python tools/main.py jester RGB \
 # AR mobilenet v2 training
 python tools/main.py ar RGB \
     --arch mobilenetv2 --num_segments 8 --consensus_type=avg \
-    --gd 20 --lr 0.005 --wd 1e-4 --lr_steps 200 400 --epochs 1000 \
-    --batch-size 32 -j 16 --dropout 0.5 --eval-freq=10 \
-    --shift --shift_div=8 --shift_place=blockres --npb \
-    --online \
+    --gd 20 --lr 0.005 --wd 1e-4 --lr_steps 15 30 --epochs 50 \
+    --batch-size 32 -j 16 --dropout 0.5 --eval-freq=1 \
+    --shift --shift_div=4 --shift_place=blockres --npb \
+    --online --save_params \
+    --use_weighted_sampler --steps_per_epoch 200 \
     --gpu_devices 0,1 --gpus 0 1
 
 ```

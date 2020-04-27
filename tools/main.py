@@ -19,6 +19,7 @@ from tensorboardX import SummaryWriter
 from torch.nn.utils import clip_grad_norm_
 
 from tsm.dataset import TSNDataSet, dataset_config
+from tsm.dataset.weighted_sampler import get_weighted_sampler
 from tsm.dataset.transforms import (GroupCenterCrop, GroupNormalize,
                                     GroupScale, IdentityTransform, Stack,
                                     ToTorchFormatTensor)
@@ -51,8 +52,6 @@ def _get_store_name(args):
         args.store_name += '_dense'
     if args.non_local > 0:
         args.store_name += '_nl'
-    if args.suffix is not None:
-        args.store_name += '_{}'.format(args.suffix)
     if args.online:
         args.store_name += '_online'
     if args.logs_name:
@@ -66,7 +65,7 @@ def main():
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_devices
 
     # get dataset configs
-    num_class, args.train_list, args.val_list, args.root_path, prefix = \
+    num_classes, args.train_list, args.val_list, args.root_path, prefix = \
         dataset_config.return_dataset(args.dataset, args.modality)
 
     # get store name
@@ -77,7 +76,7 @@ def main():
 
     # create model
     model = TSN(
-        num_class, args.num_segments, args.modality,
+        num_classes, args.num_segments, args.modality,
         base_model=args.arch,
         consensus_type=args.consensus_type,
         dropout=args.dropout,
@@ -180,6 +179,15 @@ def main():
         data_length = 1
     elif args.modality in ['Flow', 'RGBDiff']:
         data_length = 5
+    sampler = None
+    if args.use_weighted_sampler:
+        sampler = get_weighted_sampler(
+            num_classes,
+            args.category_weights,
+            train_file_path=args.train_list,
+            num_samples=args.batch_size*args.steps_per_epoch,
+            replacement=True,
+        )
     train_loader = torch.utils.data.DataLoader(
         TSNDataSet(
             args.root_path, args.train_list,
@@ -196,7 +204,8 @@ def main():
                 normalize,
             ]), dense_sample=args.dense_sample),
         batch_size=args.batch_size,
-        shuffle=True,
+        sampler=sampler,
+        shuffle=not args.use_weighted_sampler,
         num_workers=args.workers,
         pin_memory=True,
         drop_last=True)  # prevent something not % n_GPU

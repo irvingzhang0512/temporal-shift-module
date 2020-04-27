@@ -465,7 +465,9 @@ class TSN(nn.Module):
             else:
                 print('#' * 20, 'NO FLIP!!!')
                 return torchvision.transforms.Compose([
-                    GroupMultiScaleCrop(self.input_size, [1, .875, .75, .66])
+                    GroupMultiScaleCrop(self.input_size,
+                                        [1, .875, .75, .66],
+                                        fix_crop=False,)
                 ])
         elif self.modality == 'Flow':
             return torchvision.transforms.Compose(
