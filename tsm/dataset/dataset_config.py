@@ -102,7 +102,7 @@ def return_jester(modality):
 
 def return_ar(modality):
     dataset_path = opj(ROOT_DATASET, 'AR')
-    category_file = opj(dataset_path, 'category.txt')
+    category_file = opj(dataset_path, 'label/category.txt')
     if modality == 'RGB':
         img_format = '{:05d}.jpg'
         frames_path = opj(dataset_path, 'frames')

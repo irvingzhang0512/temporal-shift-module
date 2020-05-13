@@ -46,9 +46,9 @@ def _parse_args():
     parser.add_argument('--online-ckpt-model',
                         action="store_true", default=False)
     parser.add_argument('--model-ckpt-path', type=str,
-                        default="/ssd4/zhangyiyang/temporal-shift-module/checkpoint/TSM_ar_RGB_mobilenetv2_shift4_blockres_avg_segment8_e50_online_default/ckpt.best.pth.tar")
+                        default="/ssd4/zhangyiyang/temporal-shift-module/examples/tsm-mobilenetv2_ar_online.pth.tar")
     parser.add_argument('--num-segments', type=int, default=8)
-    parser.add_argument('--shift-div', type=int, default=4)
+    parser.add_argument('--shift-div', type=int, default=8)
 
     return parser.parse_args()
 

@@ -4,6 +4,7 @@
 
 
 ```shell
+# Jester resnet50
 python tools/main.py jester RGB \
     --arch resnet50 --num_segments 8 --consensus_type=avg \
     --gd 20 --lr 0.01 --wd 1e-4 --lr_steps 20 40 --epochs 50 \
@@ -36,6 +37,7 @@ python tools/main.py ar RGB \
     --batch-size 32 -j 16 --dropout 0.5 --eval-freq=1 \
     --shift --shift_div=4 --shift_place=blockres --npb \
     --online --save_params \
+    --logs_name 5_9_dataset \
     --use_weighted_sampler --steps_per_epoch 200 \
     --gpu_devices 0,1 --gpus 0 1
 
@@ -55,7 +57,6 @@ python tools/main.py ar RGB \
     + 一共包含148093个文件夹。
     + 每个文件夹中有若干图片，代表一个样本。
     + 每个文件夹中的图片数量不一定，但都是从`00001.jpg`开始编号。
-+ Generate labels by `tools/gen_label_jester.py`.
 
 
 ### 1.2. after preprocessing
