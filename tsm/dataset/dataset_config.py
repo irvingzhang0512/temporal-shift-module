@@ -6,7 +6,7 @@
 import os
 
 opj = os.path.join
-ROOT_DATASET = '/ssd4/zhangyiyang/data/'
+ROOT_DATASET = '/hdd02/zhangyiyang/data/'
 
 
 def return_ucf101(modality):
