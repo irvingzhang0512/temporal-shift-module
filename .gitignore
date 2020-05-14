@@ -1,4 +1,5 @@
 log/
+logs-*
 checkpoint/
 __pycache__/
 .pkl_memoize_py3/
