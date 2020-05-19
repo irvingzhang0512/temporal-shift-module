@@ -8,6 +8,8 @@
 3. 运行本程序。
 
 """
+import sys
+import argparse
 import os
 import shutil
 from datetime import datetime
@@ -18,13 +20,29 @@ from to_relay_model import build_tvm_model
 from tvm import autotvm, relay
 from tvm.autotvm.tuner import GATuner, GridSearchTuner, RandomTuner, XGBTuner
 
-MODEL_TYPE = "mobilenetv2_online"
-NUM_CLASSES = 27
-CKPT_PATH = None
 
-USE_REMOTE = True
-USE_PYTORCH_TEST_MODEL = False
-USE_GPU = False
+def _parse_args():
+    parser = argparse.ArgumentParser()
+
+    # model
+    parser.add_argument("--model-type", type=str, default="mobilenetv2_online",
+                        help="[mobilenetv2_online, resnet50_online]")
+    parser.add_argument("--ckpt-path", type=str, default=None)
+    parser.add_argument("--num-classes", type=int, default=27)
+
+    # envs
+    parser.add_argument("--use-gpu", action="store_true", default=False)
+    parser.add_argument("--use-remote", action="store_true", default=False)
+    parser.add_argument("--use-pytorch-test-model",
+                        action="store_true", default=False)
+
+    # auto tuning
+    parser.add_argument("--n_trial", type=int, default=2000)
+    parser.add_argument("--early_stopping", type=int, default=600)
+    parser.add_argument("--tuner-type", type=str, default="xgb",
+                        help="[xgb, ga, random, gridsearch]")
+
+    return parser.parse_args()
 
 
 def tune_tasks(tasks,
@@ -76,6 +94,8 @@ def tune_tasks(tasks,
 
 
 def _build_pytorch_model():
+    import torch
+    import torchvision
     model_name = 'resnet18'
     model = getattr(torchvision.models, model_name)(pretrained=False)
     model = model.eval()
@@ -91,26 +111,23 @@ def _build_pytorch_model():
     return mod, params
 
 
-if __name__ == '__main__':
-    import sys
-    import torchvision
-    import torch
-    import os.path.join as opj
+def main(args):
+    opj = os.path.join
     sys.path.append("/hdd02/zhangyiyang/temporal-shift-module")
 
     logs_basename = './logs'
 
-    if USE_GPU and USE_REMOTE:
+    if args.use_gpu and args.use_remote:
         from tvm.autotvm.measure.measure_methods import set_cuda_target_arch
         set_cuda_target_arch('sm_53')
         target = tvm.target.cuda(model="nano")
         target_host = "llvm -target=aarch64-linux-gnu"
         logs_basename += "-gpu-jetbot-"
-    elif USE_GPU:
+    elif args.use_gpu:
         target = tvm.target.cuda()
         target_host = "llvm"
         logs_basename += "-gpu-server-"
-    elif USE_REMOTE:
+    elif args.use_remote:
         target = 'llvm'
         target_host = "llvm -target=aarch64-linux-gnu"
         logs_basename += "-cpu-jetbot-"
@@ -120,18 +137,19 @@ if __name__ == '__main__':
         logs_basename += "-cpu-server-"
 
     dtype = 'float32'
-
+    logs_basename += args.model_type + "-"
     log_dir = logs_basename + str(int(datetime.now().timestamp()*1000))
     if os.path.isdir(log_dir):
         shutil.rmtree(log_dir)
     os.makedirs(log_dir)
-    log_file = opj(log_dir, "%s.log" % MODEL_TYPE)
+    log_file = opj(log_dir, "%s.log" % args.model_type)
 
     # build tvm relay model
-    if USE_PYTORCH_TEST_MODEL:
+    if args.use_pytorch_test_model:
         mod, params = _build_pytorch_model()
     else:
-        mod, params = build_tvm_model(MODEL_TYPE, NUM_CLASSES, CKPT_PATH)
+        mod, params = build_tvm_model(
+            args.model_type, args.num_classes, args.ckpt_path)
     print('tvm model built successfully...')
 
     # extract tasks
@@ -143,7 +161,7 @@ if __name__ == '__main__':
                                               ops=(relay.op.get("nn.conv2d"),))
 
     # run tuning tasks
-    if USE_REMOTE:
+    if args.use_remote:
         runner = autotvm.RPCRunner(
             'jetbot', '0.0.0.0', 9190,
             number=5, repeat=3,
@@ -156,9 +174,9 @@ if __name__ == '__main__':
     tuning_option = {
         'log_filename': log_file,
 
-        'tuner': 'xgb',
-        'n_trial': 200,
-        'early_stopping': 100,
+        'tuner': args.tuner_type,
+        'n_trial': args.n_trial,
+        'early_stopping': args.early_stopping,
 
         'measure_option': autotvm.measure_option(
             builder=autotvm.LocalBuilder(timeout=1000),
@@ -176,5 +194,9 @@ if __name__ == '__main__':
         lib.export_library(opj(log_dir, 'deploy_lib.tar'))
         with open(opj(log_dir, 'deploy_graph.json'), "w") as fo:
             fo.write(graph)
-        with open(opj(log_dir, 'deploy_param.jsparamson'), "wb") as fo:
+        with open(opj(log_dir, 'deploy_param.params'), "wb") as fo:
             fo.write(relay.save_param_dict(params))
+
+
+if __name__ == '__main__':
+    main(_parse_args())

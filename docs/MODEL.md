@@ -3,19 +3,23 @@
 
 + [模型相关介绍](#模型相关介绍)
   + [0. 前言](#0-前言)
-  + [1. TSM训练模型](#1-tsm训练模型)
+  + [1. TSM离线模型](#1-tsm离线模型)
     + [1.1. 模型总体结构](#11-模型总体结构)
     + [1.2. Shift 模块](#12-shift-模块)
     + [1.3. 其他参数](#13-其他参数)
-  + [2. 在线模型](#2-在线模型)
+  + [2. TSM在线模型](#2-tsm在线模型)
 
 ## 0. 前言
 + 目标：介绍本项目中模型相关内容。
-+ 主要内容：
-  + TSM训练模型，分别介绍总体结构、shift模块以及其他相关模块。
-  + TSM在线模型。
++ 本项目模型分为两类：TSM离线模型与TSM在线模型。
+  + 离线模型：指的是由 `tsm.models.tsn.TSN` 定义的模型，输入 `num_segments` 张图片，输出分类结果，用于训练。
+  + 在线模型：只通过 `tsm.model.tsn.mobilenetv2_tsm_online` 与 `tsm.model.resnet_tsm_online` 定义的模型，输入一张图片以及buffer，输出分类结果。一般用于边缘设备快速推理。
+  + 两者比较：
+    + 离线模型的精度较高，但所需要的内存、推理时间较多。
+    + 在线模型的角度较低，但所需要的内存、推理时间较少。
++ 下面分别介绍离线模型与在线模型。
 
-## 1. TSM训练模型
+## 1. TSM离线模型
 
 ### 1.1. 模型总体结构
 + 主要功能就是搭建 TSM 模型。
@@ -36,7 +40,7 @@
   + BNInception
       + 通过 `archs/bn_inception.py` 构建基本对象。
       + 之后设置了 temporal shift module 以及`base_model.last_layer_name`。
-  + **设置 temporal shift module** 相关代码位于 `ops/temporal_shift.py` 中，主要就是有两种方式：
+  + **设置 temporal shift module** 相关代码位于 `tsm/models/temporal_shift.py` 中，主要就是有两种方式：
       + mobilenetv2/bninception 的做法是通过 `TemporalShift` 来替代普通卷基层。
       + resnet 的做法是调用 `make_temporal_shift`。
 + prepare tsn
@@ -58,9 +62,10 @@
 ### 1.2. Shift 模块
 + 代码都在 `tsm/models/temporal_shift.py` 中。
 + 相关参数：
-  + `--shift`
-  + `--shift_div`
-  + `--shift_place`
+  + `--shift`：是否进行shift操作。
+  + `--shift_div`：shift操作的channels所占的比例。
+  + `--shift_place`：shift操作的位置。
+  + `--bi_direction`：shift操作的类型，根据论文有 uni/bi 两种方式。
 + 功能：实现TSM的中最关键的 temporal shift。
   + 最核心的代码就是 `TemporalShift` 类。
   + 使用方法就是在构建 base net 的时候调用相关代码：
@@ -75,23 +80,25 @@
 + consensus type
 + partial bn
 
-## 2. 在线模型
-+ 源码就是在 `tsm/models/mobilenet_v2_tsm_online.py` 中，关键在于 `MobileNetV2` 类。
-+ 在线模型与训练模型的比较：
+## 2. TSM在线模型
++ 目前提供了两种在线模型，分别是：
+  +  `tsm/models/mobilenet_v2_tsm_online.py` 中的 `MobileNetV2`。
+  +  `tsm/models/resnet_tsm_online.py` 中的 `resnet50`。
++ 以mobilenetv2为例，比较在线模型与离线模型
   + backbone-MobilenetV2本身结构相同，只是定义方式不一样，参数名称有点区别。
   + 两者输入数据不同：
-    + 训练模型的输入是`num_segments`张图片。
+    + 离线模型的输入是`num_segments`张图片。
     + 在线模型的输入是1张图片以及保留下来的buffer。
       + 所谓buffer就是中间进行shift操作层的`1/8*num_segments`的特征图。
       + 比如，如果进行shift操作的输入特征图尺寸为 `[1, 32, 28, 28]`，那么对应的buffer的尺寸就是 `[1, 4, 28, 28]`。
   + 两者的输出不同：
-    + 训练模型的输出就是分类结果。
+    + 离线模型的输出就是分类结果。
     + 在线模型的输出是分类结果以及buffers。
   + 两者shift操作的方法不同。
-    + 训练模型中的shift操作输入数据的 shape 形如 `[batch_size, num_segments, num_channels, h, w]`，而输入进行shift操作的是 `num_channels`。
+    + 离线模型中的shift操作输入数据的 shape 形如 `[batch_size, num_segments, num_channels, h, w]`，而输入进行shift操作的是 `num_channels`。
     + 在线模型中的 shift 操作其实是对 `[1, num_channels, h, w]` 中的 `num_channels` 进行操作。
       + 大概思路就是，在 t 时刻，在需要进行shift操作的层中：
         + 保留前 `1/8 * num_channels` 的特征，作为buffer传递，等到 t+1 时刻使用。
         + 使用 t-1 时刻保存的 `1/8 * num_channels` 的特征以及当前时刻剩下的 `7/8 * num_segments` 作为输入，进行普通卷积操作。 
-+ 在线模型并不需要单独训练，只需要把训练模型的参数转换一下，就可以直接用于在线模型。
-  + 不严格地说，训练模型的实质就是 `num_segments` 张图片分别计算了一次分类结果，然后取平均。在线模型就是拿一张图片算了分类结果。
++ 在线模型并不需要单独训练，只需要把离线模型的参数转换一下，就可以直接用于在线模型。
+  + 不严格地说，离线模型的实质就是 `num_segments` 张图片分别计算了一次分类结果，然后取平均。在线模型就是拿一张图片算了分类结果。

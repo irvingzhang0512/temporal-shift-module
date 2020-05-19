@@ -174,6 +174,7 @@ class MobileNetV2(nn.Module):
                 x = f(x)
         x = x.mean(3).mean(2)
         x = self.classifier(x)
+        x = torch.softmax(x, dim=1)
         return (x, *out_buffer)
 
     def _initialize_weights(self):

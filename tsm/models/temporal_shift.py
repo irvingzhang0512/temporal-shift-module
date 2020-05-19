@@ -16,21 +16,21 @@ class TemporalShift(nn.Module):
                  n_segment=3,
                  n_div=8,
                  inplace=False,
-                 offline=True,
+                 uni_direction=True,
                  ):
         super(TemporalShift, self).__init__()
         self.net = net
         self.n_segment = n_segment
         self.fold_div = n_div
         self.inplace = inplace
-        self.offline = offline
+        self.uni_direction = uni_direction
 
     def forward(self, x):
         x = self.shift(x,
                        self.n_segment,
                        fold_div=self.fold_div,
                        inplace=self.inplace,
-                       offline=self.offline,
+                       uni_direction=self.uni_direction,
                        )
         return self.net(x)
 
@@ -38,7 +38,7 @@ class TemporalShift(nn.Module):
     def shift(x, n_segment,
               fold_div=3,
               inplace=False,
-              offline=True):
+              uni_direction=True):
         nt, c, h, w = x.size()
         n_batch = nt // n_segment
         x = x.view(n_batch, n_segment, c, h, w)
@@ -53,14 +53,14 @@ class TemporalShift(nn.Module):
         else:
             out = torch.zeros_like(x)
 
-            if offline:
+            if uni_direction:
+                # shift right
+                out[:, 1:, :fold] = x[:, :-1, :fold]
+            else:
                 # shift left
                 out[:, :-1, :fold] = x[:, 1:, :fold]
                 # shift right
                 out[:, 1:, fold: 2*fold] = x[:, :-1, fold: 2*fold]
-            else:
-                # shift right
-                out[:, 1:, :fold] = x[:, :-1, :fold]
 
             out[:, :, 2 * fold:] = x[:, :, 2 * fold:]  # not shift
 
@@ -70,7 +70,7 @@ class TemporalShift(nn.Module):
     def shift2(x, n_segment,
                fold_div=3,
                inplace=False,
-               offline=True,
+               uni_direction=True,
                batch_size=1,):
         nt, c, h, w = x.size()
         x = x.view(batch_size, n_segment, c, h, w)
@@ -83,7 +83,7 @@ class TemporalShift(nn.Module):
             out1_2 = torch.zeros((batch_size, 1, fold, h, w), device=x.device)
             out1 = torch.cat((out1_1, out1_2), dim=1)
 
-            if offline:
+            if uni_direction:
                 # shift right
                 out2_1 = torch.zeros(
                     (batch_size, 1, fold, h, w), device=x.device)
@@ -156,7 +156,7 @@ class TemporalPool(nn.Module):
 def make_temporal_shift(net, n_segment, n_div=8,
                         place='blockres',
                         temporal_pool=False,
-                        offline=True):
+                        uni_direction=True):
     """为resnet设计的"""
     if temporal_pool:
         # 8, 4, 4, 4
@@ -175,7 +175,7 @@ def make_temporal_shift(net, n_segment, n_div=8,
                     # 把ResNet中每个block都替换为TemporalShift对象
                     blocks[i] = TemporalShift(
                         b, n_segment=this_segment, n_div=n_div,
-                        offline=offline)
+                        uni_direction=uni_direction)
                 return nn.Sequential(*(blocks))
 
             net.layer1 = make_block_temporal(net.layer1, n_segment_list[0])
@@ -195,7 +195,7 @@ def make_temporal_shift(net, n_segment, n_div=8,
                     if i % n_round == 0:
                         blocks[i].conv1 = TemporalShift(
                             b.conv1, n_segment=this_segment, n_div=n_div,
-                            offline=offline)
+                            uni_direction=uni_direction)
                 return nn.Sequential(*blocks)
 
             net.layer1 = make_block_temporal(net.layer1, n_segment_list[0])

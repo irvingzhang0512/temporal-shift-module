@@ -85,6 +85,8 @@ if __name__ == "__main__":
     # 第一个路径中应该有很多子目录，每个目录代表一个分类
     dir_path = sys.argv[1]
     dst_dir_path = sys.argv[2]
+    # dir_path = "/hdd02/zhangyiyang/data/kinetics-400/train_256"
+    # dst_dir_path = "/hdd01/zhangyiyang/data/kinetics-400/frames"
 
     # 依次遍历输入路径中的每个子目录
     # 即依次遍历每个类型
