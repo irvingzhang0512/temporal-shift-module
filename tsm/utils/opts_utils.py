@@ -13,7 +13,7 @@ parser.add_argument('--val_list', type=str, default="")
 parser.add_argument('--root_path', type=str, default="")
 parser.add_argument('--store_name', type=str, default="")
 parser.add_argument('--logs_name', type=str, default="default")
-parser.add_argument('--save_params', action="store_true")
+parser.add_argument('--save_total_model', action="store_true")
 
 
 # ======================== Sampler Configs =========================
@@ -29,7 +29,7 @@ parser.add_argument('--arch', type=str, default="mobilenetv2")
 parser.add_argument('--num_segments', type=int, default=8)
 parser.add_argument('--consensus_type', type=str, default='avg')
 parser.add_argument('--k', type=int, default=3)
-parser.add_argument('--online', action="store_true")
+parser.add_argument('--bi_direction', action="store_true")
 
 parser.add_argument('--shift', default=False,
                     action="store_true", help='use shift for models')
@@ -96,7 +96,6 @@ parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
 parser.add_argument('--snapshot_pref', type=str, default="")
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
-parser.add_argument('--gpus', nargs='+', type=int, default=None)
 parser.add_argument('--gpu_devices', default="0,1,2,3", type=str)
 parser.add_argument('--flow_prefix', default="", type=str)
 parser.add_argument('--root_log', type=str, default='log')

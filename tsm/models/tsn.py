@@ -14,16 +14,17 @@ from .basic_ops import ConsensusModule
 
 
 class TSN(nn.Module):
-    def __init__(self, num_class, num_segments, modality,
-                 base_model='resnet101', new_length=None,
+    def __init__(self,
+                 num_classes=27, num_segments=8, modality='RGB',
+                 base_model='mobilenetv2', new_length=None,
                  consensus_type='avg', before_softmax=True,
-                 dropout=0.8, img_feature_dim=256,
-                 crop_num=1, partial_bn=True,
+                 dropout=0.5, img_feature_dim=256,
+                 crop_num=1, partial_bn=False,
                  print_spec=True, pretrain='imagenet',
-                 is_shift=False, shift_div=8,
+                 is_shift=True, shift_div=8,
                  shift_place='blockres', fc_lr5=False,
                  temporal_pool=False, non_local=False,
-                 offline=True,
+                 uni_direction=True,
                  ):
         super(TSN, self).__init__()
         self.modality = modality
@@ -46,8 +47,7 @@ class TSN(nn.Module):
         self.non_local = non_local
         self.print_spec = print_spec
 
-        # online/offline
-        self.offline = offline
+        self.uni_direction = uni_direction
 
         if not before_softmax and consensus_type != 'avg':
             raise ValueError("Only avg consensus can be used after Softmax")
@@ -71,7 +71,7 @@ class TSN(nn.Module):
                        self.dropout, self.img_feature_dim)))
 
         self._prepare_base_model(base_model)
-        self._prepare_tsn(num_class)
+        self._prepare_tsn(num_classes)
 
         if self.modality == 'Flow':
             print("Converting the ImageNet model to a flow init model")
@@ -91,17 +91,17 @@ class TSN(nn.Module):
         if partial_bn:
             self.partialBN(True)
 
-    def _prepare_tsn(self, num_class):
+    def _prepare_tsn(self, num_classes):
         feature_dim = getattr(
             self.base_model, self.base_model.last_layer_name).in_features
         if self.dropout == 0:
             setattr(self.base_model, self.base_model.last_layer_name,
-                    nn.Linear(feature_dim, num_class))
+                    nn.Linear(feature_dim, num_classes))
             self.new_fc = None
         else:
             setattr(self.base_model, self.base_model.last_layer_name,
                     nn.Dropout(p=self.dropout))
-            self.new_fc = nn.Linear(feature_dim, num_class)
+            self.new_fc = nn.Linear(feature_dim, num_classes)
 
         # 参数初始化
         std = 0.001
@@ -117,8 +117,6 @@ class TSN(nn.Module):
         return feature_dim
 
     def _prepare_base_model(self, base_model):
-        print('=> base model: {}'.format(base_model))
-
         if 'resnet' in base_model:
             self.base_model = getattr(torchvision.models, base_model)(
                 True if self.pretrain == 'imagenet' else False)
@@ -129,7 +127,7 @@ class TSN(nn.Module):
                                     n_div=self.shift_div,
                                     place=self.shift_place,
                                     temporal_pool=self.temporal_pool,
-                                    offline=self.offline,)
+                                    uni_direction=self.uni_direction,)
 
             if self.non_local:
                 print('Adding non-local module...')
@@ -168,14 +166,11 @@ class TSN(nn.Module):
                 for m in self.base_model.modules():
                     if isinstance(m, InvertedResidual) and \
                             len(m.conv) == 8 and m.use_res_connect:
-                        if self.print_spec:
-                            print('Adding temporal shift... {}'.format(
-                                m.use_res_connect))
                         m.conv[0] = TemporalShift(
                             m.conv[0],
                             n_segment=self.num_segments,
                             n_div=self.shift_div,
-                            offline=self.offline,
+                            uni_direction=self.uni_direction,
                         )
             if self.modality == 'Flow':
                 self.input_mean = [0.5]

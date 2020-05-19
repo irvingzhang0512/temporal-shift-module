@@ -47,8 +47,8 @@ def _get_store_name(args):
         args.store_name += '_dense'
     if args.non_local > 0:
         args.store_name += '_nl'
-    if args.online:
-        args.store_name += '_online'
+    if args.bi_direction:
+        args.store_name += '_bi_direction_'
     if args.logs_name:
         args.store_name += '_' + args.logs_name
     print('storing name: ' + args.store_name)
@@ -83,7 +83,7 @@ def main():
         fc_lr5=not (args.tune_from and args.dataset in args.tune_from),
         temporal_pool=args.temporal_pool,
         non_local=args.non_local,
-        offline=not args.online,
+        uni_direction=not args.bi_direction,
     )
     print(model)
 
@@ -103,7 +103,7 @@ def main():
     train_augmentation = model.get_augmentation(flip=flip)
 
     # set parallel model
-    model = torch.nn.DataParallel(model, device_ids=args.gpus).cuda()
+    model = torch.nn.DataParallel(model).cuda()
 
     # create optimizer
     optimizer = torch.optim.SGD(policies,
@@ -274,7 +274,7 @@ def main():
                 'state_dict': model.state_dict(),
                 'optimizer': optimizer.state_dict(),
                 'best_prec1': best_prec1,
-            }, is_best, model, args.save_params)
+            }, is_best, model, not args.save_total_model)
 
 
 def train(train_loader, model, criterion, optimizer, epoch, log, tf_writer):

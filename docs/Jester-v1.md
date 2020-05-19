@@ -1,48 +1,5 @@
 # Jester v1
 
-## 0. Overview
-
-
-```shell
-# Jester resnet50
-python tools/main.py jester RGB \
-    --arch resnet50 --num_segments 8 --consensus_type=avg \
-    --gd 20 --lr 0.01 --wd 1e-4 --lr_steps 20 40 --epochs 50 \
-    --batch-size 64 -j 16 --dropout 0.5 --eval-freq=1 \
-    --shift --shift_div=8 --shift_place=blockres --npb \
-    --online --save_params\
-    --gpu_devices 0,1,2,3 --gpus 0 1 2 3
-
-# no shift
-python tools/main.py jester RGB \
-    --arch mobilenetv2 --num_segments 8 --consensus_type=avg \
-    --gd 20 --lr 0.02 --wd 1e-4 --lr_steps 20 40 --epochs 50 \
-    --batch-size 128 -j 16 --dropout 0.5 --eval-freq=1 \
-    --online --npb \
-    --gpu_devices 0,1,2,3 --gpus 0 1 2 3
-
-# Jester mobilenet v2
-python tools/main.py jester RGB \
-    --arch mobilenetv2 --num_segments 8 --consensus_type=avg \
-    --gd 20 --lr 0.02 --wd 1e-4 --lr_steps 20 40 --epochs 50 \
-    --batch-size 128 -j 16 --dropout 0.5 --eval-freq=1 \
-    --shift --shift_div=8 --shift_place=blockres --npb \
-    --logs_name shift1_4  --online --save_params\
-    --gpu_devices 0,1,2,3 --gpus 0 1 2 3
-
-# AR mobilenet v2 training
-python tools/main.py ar RGB \
-    --arch mobilenetv2 --num_segments 8 --consensus_type=avg \
-    --gd 20 --lr 0.005 --wd 1e-4 --lr_steps 15 30 --epochs 50 \
-    --batch-size 32 -j 16 --dropout 0.5 --eval-freq=1 \
-    --shift --shift_div=4 --shift_place=blockres --npb \
-    --online --save_params \
-    --logs_name 5_9_dataset \
-    --use_weighted_sampler --steps_per_epoch 200 \
-    --gpu_devices 0,1 --gpus 0 1
-
-```
-
 ## 1. Jester v1 Dataset
 
 ### 1.1. Raw dataset

@@ -25,7 +25,8 @@ class Bottleneck(nn.Module):
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         width = int(planes * (base_width / 64.)) * groups
-        # Both self.conv2 and self.downsample layers downsample the input when stride != 1
+        # Both self.conv2 and self.downsample
+        # layers downsample the input when stride != 1
         self.conv1 = conv1x1(inplanes, width)
         self.bn1 = norm_layer(width)
         self.conv2 = conv3x3(width, width, stride, groups, dilation)
@@ -69,7 +70,8 @@ class BottleneckWithBuffer(nn.Module):
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         width = int(planes * (base_width / 64.)) * groups
-        # Both self.conv2 and self.downsample layers downsample the input when stride != 1
+        # Both self.conv2 and self.downsample layers
+        # downsample the input when stride != 1
         self.conv1 = conv1x1(inplanes, width)
         self.bn1 = norm_layer(width)
         self.conv2 = conv3x3(width, width, stride, groups, dilation)
@@ -222,6 +224,7 @@ class ResNet(nn.Module):
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
         x = self.fc(x)
+        x = torch.softmax(x, dim=1)
 
         return (x, *(b1 + b2 + b3 + b4))
 
@@ -259,5 +262,6 @@ if __name__ == '__main__':
         torch.zeros([1, 256, 7, 7]),
     ]
     model = resnet50()
-    model(torch.randn((1, 3, 224, 224)), *resnet50_shift_buffer)
-    print(model)
+    outputs = model(torch.randn((1, 3, 224, 224)), *resnet50_shift_buffer)
+    for output in outputs:
+        print(output.shape)

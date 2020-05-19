@@ -11,7 +11,7 @@ import json
 
 
 DATASET_NAME = 'something-something-v2'
-DATASET_PATH = "/ssd4/zhangyiyang/data/something-something-v2"
+DATASET_PATH = "/hdd02/zhangyiyang/data/something-something-v2"
 LABEL_PATH = os.path.join(DATASET_PATH, 'label')
 IMAGE_PATH = os.path.join(DATASET_PATH, '20bn-something-something-v2-frames')
 
