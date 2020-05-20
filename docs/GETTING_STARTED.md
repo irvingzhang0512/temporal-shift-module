@@ -13,6 +13,20 @@
 ## 1. 训练脚本
 
 ### 1.1. Jester
++ results
+
+|  backbone   | segments | shift | val accuracy |
+| :---------: | :------: | :---: | :----------: |
+| mobilenetv2 |    8     |   8   |    94.515    |
+| mobilenetv2 |    8     |   4   |      /       |
+| mobilenetv2 |    16    |   8   |      /       |
+| mobilenetv2 |    16    |   4   |      /       |
+|  resnet50   |    8     |   8   |    95.719    |
+|  resnet50   |    8     |   4   |      /       |
+|  resnet50   |    16    |   8   |      /       |
+|  resnet50   |    16    |   4   |      /       |
+
++ 脚本
 ```shell
 # Jester resnet50
 python tools/main.py jester RGB \
@@ -20,7 +34,7 @@ python tools/main.py jester RGB \
     --gd 20 --lr 0.01 --wd 1e-4 --lr_steps 20 40 --epochs 50 \
     --batch-size 64 -j 16 --dropout 0.5 --eval-freq=1 \
     --shift --shift_div=8 --shift_place=blockres --npb \
-    --gpu_devices 0,1,2,3 --gpus 0 1 2 3
+    --gpu_devices 0,1,2,3
 
 # no shift
 python tools/main.py jester RGB \
@@ -28,25 +42,36 @@ python tools/main.py jester RGB \
     --gd 20 --lr 0.02 --wd 1e-4 --lr_steps 20 40 --epochs 50 \
     --batch-size 128 -j 16 --dropout 0.5 --eval-freq=1 \
     --npb \
-    --gpu_devices 0,1,2,3 --gpus 0 1 2 3
+    --gpu_devices 0,1,2,3
 
 # Jester mobilenet v2
 python tools/main.py jester RGB \
-    --arch mobilenetv2 --num_segments 8 --consensus_type=avg \
+    --arch mobilenetv2 --num_segments 16 --consensus_type=avg \
     --gd 20 --lr 0.02 --wd 1e-4 --lr_steps 20 40 --epochs 50 \
     --batch-size 128 -j 16 --dropout 0.5 --eval-freq=1 \
     --shift --shift_div=8 --shift_place=blockres --npb \
-    --logs_name shift1_4 \
-    --gpu_devices 0,1,2,3 --gpus 0 1 2 3
+    --logs_name default \
+    --gpu_devices 0,1,2,3
 
 ```
 
 ### 1.2. AR
++ dataset 5.9
+|  backbone   | segments | shift | val accuracy |
+| :---------: | :------: | :---: | :----------: |
+| mobilenetv2 |    8     |   8   |    98.409    |
+| mobilenetv2 |    8     |   4   |    98.492    |
+| mobilenetv2 |    16    |   8   |    99.246    |
+| mobilenetv2 |    16    |   4   |    98.744    |
+|  resnet50   |    8     |   8   |    99.246    |
+|  resnet50   |    8     |   4   |    98.827    |
+|  resnet50   |    16    |   8   |    99.581    |
+|  resnet50   |    16    |   4   |    99.079    |
 
 ```shell
 # AR mobilenet v2 training
 python tools/main.py ar RGB \
-    --arch mobilenetv2 --num_segments 8 \
+    --arch mobilenetv2 --num_segments 16 \
     --gd 20 --wd 1e-4 --lr_steps 15 30 --epochs 50 \
     -j 16 --dropout 0.5 --eval-freq=1 --consensus_type=avg \
     --shift --shift_div=4 --shift_place=blockres --npb \
@@ -56,10 +81,10 @@ python tools/main.py ar RGB \
 
 # AR resnet50 training
 python tools/main.py ar RGB \
-    --arch resnet50 --num_segments 16 \
+    --arch resnet50 --num_segments 8 \
     --gd 20 --wd 1e-4 --lr_steps 15 30 --epochs 50 \
     -j 16 --dropout 0.5 --eval-freq=1 --consensus_type=avg \
-    --shift --shift_div=4 --shift_place=blockres --npb \
+    --shift --shift_div=8 --shift_place=blockres --npb \
     --use_weighted_sampler --steps_per_epoch 200 --batch-size 32 --lr 0.005 \
     --gpu_devices 2,3 --logs_name 5_9_dataset
 ```

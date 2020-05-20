@@ -17,13 +17,11 @@ class TSN(nn.Module):
     def __init__(self,
                  num_classes=27, num_segments=8, modality='RGB',
                  base_model='mobilenetv2', new_length=None,
-                 consensus_type='avg', before_softmax=True,
-                 dropout=0.5, img_feature_dim=256,
-                 crop_num=1, partial_bn=False,
-                 print_spec=True, pretrain='imagenet',
-                 is_shift=True, shift_div=8,
-                 shift_place='blockres', fc_lr5=False,
-                 temporal_pool=False, non_local=False,
+                 consensus_type='avg', before_softmax=False,
+                 crop_num=1, partial_bn=False, img_feature_dim=256,
+                 print_spec=True, pretrain='imagenet', dropout=0.5,
+                 is_shift=True, shift_div=8, shift_place='blockres',
+                 fc_lr5=False, temporal_pool=False, non_local=False,
                  uni_direction=True,
                  ):
         super(TSN, self).__init__()

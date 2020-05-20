@@ -1,15 +1,27 @@
 """
+有两种模式，本地运行模式以及服务器交叉编译模式。
++ 本地模式：默认选项。
++ 服务器交叉编译模式：通过 `--use-cross-compile` 选择。
+    + 需要在边缘设备（如Jetbot）上运行 `python3 -m tvm.exec.rpc_server --host 0.0.0.0 --port 9090`
+    + 通过 `--remote-ip` 与 `--remote-port` 指定远程设备的ip与端口号。
 
+注意事项：
++ 指定的lib/graph/params文件必须是在指定设备上 Auto Tuning 后得到的。
+    + 比如，如果要使用本地运行模式，则要求 Auto Tuning 必须是在以本地设备作为输入。
+    + 换句话说，在Jetbot上Auto Tuning的结果放在Server上本地运行，是会报错的。
 """
 import argparse
-import numpy as np
-from typing import Tuple
-import tvm
+import os
 import time
+from typing import Tuple
+
 import cv2
-import torch
+import numpy as np
 import torchvision
 from PIL import Image
+
+import torch
+import tvm
 import tvm.contrib.graph_runtime as graph_runtime
 
 WINDOW_NAME = 'Video Gesture Recognition'
@@ -19,20 +31,21 @@ def _parse_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--input-video", type=str,
-                        default="/hdd02/zhangyiyang/temporal-shift-module/data/input/ar-1.mp4")
+                        default="/hdd02/zhangyiyang/temporal-shift-module/data/videos/input/ar.mp4")
     parser.add_argument("--categories-file-path", type=str,
                         default="/hdd02/zhangyiyang/data/AR/label/category.txt")
+    parser.add_argument("--doing-nothing-label-id", type=int, default=0)
+    parser.add_argument("--doing-other-label-id", type=int, default=1)
 
     # model
-    parser.add_argument("--model-type", type=str, default="resnet50_online",
+    parser.add_argument("--model-type", type=str, default="mobilenetv2_online",
                         help="[mobilenetv2_online, resnet50_online]")
     parser.add_argument("--lib-file-path", type=str,
-                        default="./logs-gpu-jetbot-resnet50_online-1589620827900/deploy_lib.tar")
-    parser.add_argument("--lib-name", type=str, default="deploy_lib.tar")
+                        default="./logs-gpu-jetbot-mobilenetv2_online-1589948376552/deploy_lib.tar")
     parser.add_argument("--graph-file-path", type=str,
-                        default="./logs-gpu-jetbot-resnet50_online-1589620827900/deploy_graph.json")
+                        default="./logs-gpu-jetbot-mobilenetv2_online-1589948376552/deploy_graph.json")
     parser.add_argument("--params-file-path", type=str,
-                        default="./logs-gpu-jetbot-resnet50_online-1589620827900/deploy_param.params")
+                        default="./logs-gpu-jetbot-mobilenetv2_online-1589948376552/deploy_param.params")
 
     # post preprocessing
     parser.add_argument("--use-history-logit",
@@ -96,7 +109,7 @@ def get_executor(args):
     if args.use_cross_compile:
         remote = tvm.rpc.connect(args.remote_ip, args.remote_port)
         remote.upload(args.lib_file_path)
-        loaded_lib = remote.load_module(args.lib_name)
+        loaded_lib = remote.load_module(os.path.basename(args.lib_file_path))
         ctx = remote.gpu()
     else:
         loaded_lib = tvm.runtime.load_module(args.lib_file_path)
@@ -290,15 +303,12 @@ def main(args):
             assert isinstance(feat, tvm.nd.NDArray)
 
             if args.softmax_threshold > 0:
-                feat_np = feat.asnumpy().reshape(-1)
-                feat_np -= feat_np.max()
-                softmax = np.exp(feat_np) / np.sum(np.exp(feat_np))
-
+                softmax = feat.asnumpy().reshape(-1)
                 print(max(softmax))
                 if max(softmax) > args.softmax_threshold:
                     idx_ = np.argmax(feat.asnumpy(), axis=1)[0]
                 else:
-                    idx_ = idx
+                    idx_ = args.doing_nothing_label_id
             else:
                 idx_ = np.argmax(feat.asnumpy(), axis=1)[0]
 
@@ -315,22 +325,25 @@ def main(args):
 
             current_time = t2 - t1
 
-        img = cv2.resize(img, (640, 480))
-        img = img[:, ::-1]
-        height, width, _ = img.shape
-        label = np.zeros([height // 10, width, 3]).astype('uint8') + 255
-
-        cv2.putText(label, 'Prediction: ' + categories[idx],
-                    (0, int(height / 16)),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7, (0, 0, 0), 2)
-        cv2.putText(label, '{:.1f} Vid/s'.format(1 / current_time),
-                    (width - 170, int(height / 16)),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7, (0, 0, 0), 2)
-
-        img = np.concatenate((img, label), axis=0)
         if args.show:
+            # draw image
+            img = cv2.resize(img, (640, 480))
+            if args.output_flip:
+                img = img[:, ::-1]
+            height, width, _ = img.shape
+            label = np.zeros([height // 10, width, 3]).astype('uint8') + 255
+
+            cv2.putText(label, 'Prediction: ' + categories[idx],
+                        (0, int(height / 16)),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.7, (0, 0, 0), 2)
+            cv2.putText(label, '{:.1f} Vid/s'.format(1 / current_time),
+                        (width - 170, int(height / 16)),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.7, (0, 0, 0), 2)
+            img = np.concatenate((img, label), axis=0)
+
+            # show image
             cv2.imshow(WINDOW_NAME, img)
             key = cv2.waitKey(10)
             if key & 0xFF == ord('q') or key == 27:  # exit
