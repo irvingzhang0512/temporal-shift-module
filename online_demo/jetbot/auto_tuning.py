@@ -5,7 +5,7 @@
 2. 在Jetbot上连接 tracker：
 `python3 -m tvm.exec.rpc_server --tracker=10.0.10.56:9190 --key=1080ti`
 
-3. 运行本程序。
+3. 运行本程序。得到的部署文件保存在 `logs-{cpu/gpu}-{jetbot/server}-{model-type}-{timestamp}` 中。
 
 """
 import sys
@@ -27,8 +27,9 @@ def _parse_args():
     # model
     parser.add_argument("--model-type", type=str, default="mobilenetv2_online",
                         help="[mobilenetv2_online, resnet50_online]")
-    parser.add_argument("--ckpt-path", type=str, default=None)
-    parser.add_argument("--num-classes", type=int, default=27)
+    parser.add_argument("--ckpt-path", type=str,
+                        default='./mobilenetv2-online-segments8-shift8.pth.tar')
+    parser.add_argument("--num-classes", type=int, default=6)
 
     # envs
     parser.add_argument("--use-gpu", action="store_true", default=False)

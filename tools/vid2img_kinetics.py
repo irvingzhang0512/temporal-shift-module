@@ -14,6 +14,7 @@ from multiprocessing import Pool
 from tqdm import tqdm
 
 n_thread = 100
+target_fps = 5
 
 
 def vid2jpg(file_name, class_path, dst_class_path):
@@ -32,18 +33,22 @@ def vid2jpg(file_name, class_path, dst_class_path):
                 print('remove {}'.format(dst_directory_path))
                 os.mkdir(dst_directory_path)
             else:
-                print('*** convert has been done: {}'.format(dst_directory_path))
+                print('*** convert has been done: {}'.format(
+                    dst_directory_path))
                 return
         else:
             os.mkdir(dst_directory_path)
     except:
         print(dst_directory_path)
         return
-    # 视频提取帧，resize为 (331, -1)，提取所有帧
-    # cmd = 'ffmpeg -i \"{}\" -threads 1 -vf scale=-1:331 -q:v 1 \"{}/img_%05d.jpg\"'.format(
-    #     video_file_path, dst_directory_path)
-    cmd = 'ffmpeg -i \"{}\" -threads 1 -q:v 0 \"{}/img_%05d.jpg\"'.format(
-        video_file_path, dst_directory_path)
+    # 视频提取帧，resize为 (331, -1)
+    cmd_format = ['ffmpeg',
+                  '-i', '\"{}\"',
+                  '-r', "{}",
+                  '-threads 1 -q:v 0',
+                  '\"{}/img_%05d.jpg\"']
+    cmd = (' '.join(cmd_format)).format(
+        video_file_path, target_fps, dst_directory_path)
     # print(cmd)
     subprocess.call(cmd, shell=True,
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -83,10 +88,10 @@ def class_process(dir_path, dst_dir_path, class_name):
 if __name__ == "__main__":
     # 输入两个路径，分别是原始视频所在的路径，一个是目标存储数据的路径
     # 第一个路径中应该有很多子目录，每个目录代表一个分类
-    dir_path = sys.argv[1]
-    dst_dir_path = sys.argv[2]
-    # dir_path = "/hdd02/zhangyiyang/data/kinetics-400/train_256"
-    # dst_dir_path = "/hdd01/zhangyiyang/data/kinetics-400/frames"
+    # dir_path = sys.argv[1]
+    # dst_dir_path = sys.argv[2]
+    dir_path = "/hdd02/zhangyiyang/data/kinetics-400/val_256"
+    dst_dir_path = "/hdd01/zhangyiyang/data/kinetics-400/val_frames"
 
     # 依次遍历输入路径中的每个子目录
     # 即依次遍历每个类型

@@ -229,13 +229,8 @@ class ResNet(nn.Module):
         return (x, *(b1 + b2 + b3 + b4))
 
 
-def _resnet(arch, layers, **kwargs):
-    model = ResNet(layers, **kwargs)
-    return model
-
-
 def resnet50(**kwargs):
-    return _resnet('resnet50', [3, 4, 6, 3], **kwargs)
+    return ResNet([3, 4, 6, 3], **kwargs)
 
 
 if __name__ == '__main__':

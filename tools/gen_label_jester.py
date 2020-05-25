@@ -1,12 +1,3 @@
-# Code for "TSM: Temporal Shift Module for Efficient Video Understanding"
-# arXiv:1811.08383
-# Ji Lin*, Chuang Gan, Song Han
-# {jilin, songhan}@mit.edu, ganchuang@csail.mit.edu
-# ------------------------------------------------------
-# Code adapted from
-# https://github.com/metalbubble/TRN-pytorch/blob/master/process_dataset.py
-# processing the raw data of the video Something-Something-V1
-
 import os
 
 osj = os.path.join

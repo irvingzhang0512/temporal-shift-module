@@ -11,6 +11,7 @@ NUM_THREADS = 100
 VIDEO_ROOT = '/hdd02/zhangyiyang/data/something-something-v2/20bn-something-something-v2'
 # Directory for extracted frames
 FRAME_ROOT = '/hdd02/zhangyiyang/data/something-something-v2/20bn-something-something-v2-frames'
+target_fps = 5
 
 
 def split(l, n):
@@ -20,10 +21,14 @@ def split(l, n):
 
 
 def extract(video, tmpl='%06d.jpg'):
-    # os.system(f'ffmpeg -i {VIDEO_ROOT}/{video} -vf -threads 1 -vf scale=-1:256 -q:v 0 '
-    #           f'{FRAME_ROOT}/{video[:-5]}/{tmpl}')
-    cmd = 'ffmpeg -i \"{}/{}\" -threads 1 -vf scale=-1:256 -q:v 0 \"{}/{}/%06d.jpg\"'.format(VIDEO_ROOT, video,
-                                                                                             FRAME_ROOT, video[:-5])
+    cmd_format = ['ffmpeg',
+                  '-i', '\"{}/{}\"',
+                  '-r', "{}",
+                  '-threads 1 -vf scale=-1:256 -q:v 0',
+                  '\"{}/{}/%06d.jpg\"']
+    cmd = (' '.join(cmd_format)).format(VIDEO_ROOT, video,
+                                        target_fps,
+                                        FRAME_ROOT, video[:-5])
     os.system(cmd)
 
 

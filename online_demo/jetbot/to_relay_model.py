@@ -8,10 +8,10 @@ def build_pytorch_model(model_type,
     model = None
     if model_type == 'mobilenetv2_online':
         from tsm.models.mobilenet_v2_tsm_online import MobileNetV2
-        model = MobileNetV2(num_classes)
+        model = MobileNetV2(num_classes).eval()
     elif model_type == 'resnet50_online':
         from tsm.models.resnet_tsm_online import resnet50
-        model = resnet50(num_classes=num_classes)
+        model = resnet50(num_classes=num_classes).eval()
     if model is not None:
         if ckpt_path is not None:
             model.load_state_dict(torch.load(ckpt_path))

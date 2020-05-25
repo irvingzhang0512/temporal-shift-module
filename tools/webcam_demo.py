@@ -1,3 +1,19 @@
+"""
+自定义视频，输出结果
+
+支持的功能
++ 支持所有在线模型与离线模型。
++ 支持输入所有类型的权重。
++ 如果backbone相同，但输入的权重与模型不匹配，会自动转换。
++ 支持本地视频文件/cv2/本地文本文件三种展示方式。
+
+使用细节
++ 通过 `--from-params-ckpt` 指定输入的ckpt是否是刚刚训练得到的。
++ 通过 `--from-online-model` 指定输入的ckpt类型。
++ 通过 `--model-type` 指定目标模型类型。
+    + 当输入的是离线模型时，还需要指定 `--num-segments` 与 `--shift-div`
+
+"""
 import argparse
 import os
 import time
@@ -8,15 +24,16 @@ import torch
 import torchvision
 from PIL import Image
 
+from tsm.builders import model_builder
+from tsm.utils.ckpt_convert_utils import convert_state_dict
+
 categories = None
 
 
 def _parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--category-file', type=str,
-                        default="/ssd4/zhangyiyang/data/AR/category.txt")
-    parser.add_argument('--online-mode', action="store_true", default=False)
-    parser.add_argument('--not-params-model', action="store_true", default=False)
+                        default="/hdd02/zhangyiyang/data/AR/label/category.txt")
     parser.add_argument('--file-name-suffix', type=str, default=None)
 
     # filter label
@@ -27,26 +44,31 @@ def _parse_args():
 
     # output
     parser.add_argument('--output-file-dir', type=str,
-                        default="/ssd4/zhangyiyang/temporal-shift-module/data/output")
+                        default="./data/videos/output")
+    parser.add_argument('--output-video-dir', type=str,
+                        default="./data/videos/output")
+    parser.add_argument('--output-video-fps', type=int, default=20)
     parser.add_argument('--output-video-height', type=int, default=480)
     parser.add_argument('--output-video-width', type=int, default=640)
-    parser.add_argument('--output-video-flip', action="store_true", default=False)
+    parser.add_argument('--output-video-flip',
+                        action="store_true", default=False)
     parser.add_argument('--show', action="store_true", default=False)
 
-    # video
+    # input video
     parser.add_argument("--tmp-video", type=str, default="./test.avi")
     parser.add_argument('--input-video', type=str,
-                        default="/ssd4/zhangyiyang/temporal-shift-module/data/input/ar-4.mp4")
+                        default="./data/videos/input/ar.mp4")
     parser.add_argument('--input-frame-interval', type=int, default=2)
-    parser.add_argument('--output-video-dir', type=str,
-                        default="/ssd4/zhangyiyang/temporal-shift-module/data/output")
-    parser.add_argument('--output-video-fps', type=int, default=20)
 
     # model
-    parser.add_argument('--online-ckpt-model',
-                        action="store_true", default=False)
+    parser.add_argument('--model-type', type=str,
+                        default="mobilenetv2_online")
     parser.add_argument('--model-ckpt-path', type=str,
-                        default="/ssd4/zhangyiyang/temporal-shift-module/examples/tsm-mobilenetv2_ar_online.pth.tar")
+                        default="checkpoint/TSM_ar_RGB_mobilenetv2_shift8_blockres_avg_segment8_e50_5_9_dataset/ckpt.best.pth.tar")
+    parser.add_argument('--from-online-model',
+                        action="store_true", default=False)
+    parser.add_argument('--from-params-ckpt',
+                        action="store_true", default=False)
     parser.add_argument('--num-segments', type=int, default=8)
     parser.add_argument('--shift-div', type=int, default=8)
 
@@ -58,7 +80,7 @@ def _draw_image(img, fps,
                 resize_shape=None, flip=True):
     if resize_shape is not None:
         img = cv2.resize(img, resize_shape)
-    
+
     if flip:
         img = img[:, ::-1]
     height, width, _ = img.shape
@@ -168,111 +190,53 @@ def get_transform():
     return transform
 
 
-def predict(online_mode, model_inputs, model, args):
+def predict(to_online_model, model_inputs, model, args):
     with torch.no_grad():
-        if online_mode:
+        if to_online_model:
             imgs, shift_buffer = model_inputs
             outputs = model(imgs, *shift_buffer)
-            logits, shift_buffer = outputs[0], outputs[1:]
-            probs = torch.softmax(logits, dim=1).squeeze(0)
+            probs, shift_buffer = outputs[0], outputs[1:]
+            probs = probs.squeeze(0)
             label_id = torch.argmax(probs)
             return label_id, probs.cpu().numpy(), shift_buffer
         else:
             imgs = torch.stack(model_inputs).view(
                 1, args.num_segments, 3, 224, 224)
-            logits = model(imgs)
-            probs = torch.softmax(logits, dim=1).squeeze(0)
+            probs = model(imgs)
+            probs = probs.squeeze(0)
             label_id = torch.argmax(probs)
             return label_id, probs.cpu().numpy()
 
 
-def _convert_state_dict(src_dict, online_mode=False, online_ckpt_model=False):
-    if (online_mode and online_ckpt_model) or \
-            (not online_mode and not online_ckpt_model):
-        return src_dict
-    if online_ckpt_model:
-        # online dict to offline dict
-        shift_ids = [3, 5, 6, 8, 9, 10, 12, 13, 15, 16]
-        original_keys = list(src_dict.keys())
-        target_keys = []
-        for s in original_keys:
-            if s.startswith("features"):
-                splits = s.split(".")
-                if s.endswith("conv.0.weight") and int(splits[1]) in shift_ids:
-                    # features.16.conv.0.weight
-                    # features.16.conv.0.net.weight
-                    s = s.replace("0.weight", "0.net.weight")
-                s = "module.base_model." + s
-            elif s.startswith("classifier"):
-                s = s.replace("classifier.", "module.new_fc.")
-            target_keys.append(s)
-    else:
-        # offline dict to online ckpt
-        original_keys = list(src_dict.keys())
-        target_keys = [
-            s.replace("module.", "")
-            .replace("base_model.", "")
-            .replace("net.", "")
-            .replace("new_fc", "classifier")
-            for s in original_keys
-        ]
-    target_dict = {target_keys[i]: src_dict[original_keys[i]]
-                   for i in range(len(original_keys))}
-    return target_dict
+def load_model(model_type, ckpt_path, num_classes,
+               to_online_model=False,
+               from_online_model=False,
+               from_params_ckpt=True,
+               num_segments=8, shift_div=8):
+    src_dict = torch.load(ckpt_path)
+    target_dict = convert_state_dict(
+        src_dict,
+        backbone=model_type.replace("_online", ""),
+        from_params_ckpt=from_params_ckpt,
+        from_online_ckpt=from_online_model,
+        to_online_ckpt=to_online_model,
+    )
+
+    kwargs = {}
+    if not to_online_model:
+        kwargs['num_segments'] = num_segments
+        kwargs['shift_div'] = shift_div
+    model = model_builder.build_model(
+        model_type, num_classes=num_classes, **kwargs
+    )
+    model.load_state_dict(target_dict)
+    return model
 
 
-def load_model(ckpt_path, args,
-               online_mode=False,
-               online_ckpt_model=False,
-               params_model=True,):
-    if not params_model:
-        return torch.load(ckpt_path)
-
-    src_dict = torch.load(ckpt_path) if online_ckpt_model \
-        else torch.load(ckpt_path)['state_dict']
-    target_dict = _convert_state_dict(src_dict,
-                                      online_mode, online_ckpt_model)
-    if online_ckpt_model:
-        num_classes = src_dict['classifier.weight'].size(0)
-    else:
-        num_classes = src_dict['module.new_fc.weight'].size(0)
-
-    if online_mode:
-        from tsm.models.mobilenet_v2_tsm_online import MobileNetV2
-        online_model = MobileNetV2(num_classes).eval()
-        online_model.load_state_dict(target_dict)
-        return online_model
-    else:
-        from tsm.models.tsn import TSN
-        model = TSN(
-            num_class=num_classes,
-            num_segments=args.num_segments,
-            modality='RGB',
-            base_model='mobilenetv2',
-            consensus_type='avg',
-            dropout=0.5,
-            img_feature_dim=256,
-            crop_num=1,
-            partial_bn=False,
-            print_spec=True,
-            pretrain='imagenet',
-            is_shift=True,
-            shift_div=args.shift_div,
-            shift_place='blockres',
-            fc_lr5=False,
-            temporal_pool=False,
-            non_local=False,
-            offline=False,
-        )
-        model = torch.nn.DataParallel(model).cuda().eval()
-        model.load_state_dict(target_dict)
-        return model
-
-
-def create_model_input(online_mode, cur_img, transform,
+def create_model_input(to_online_model, cur_img, transform,
                        imgs=None, num_segments=8,
                        shift_buffer=None,):
-    if online_mode:
+    if to_online_model:
         img_transform = transform([cur_img])
         img_transform = torch.unsqueeze(img_transform, 0)
         return img_transform, shift_buffer
@@ -285,11 +249,11 @@ def create_model_input(online_mode, cur_img, transform,
         return imgs
 
 
-def _get_output_file_name(args, suffix=".txt"):
+def _get_output_file_name(args, to_online_model, suffix=".txt"):
     file_name = os.path.basename(args.input_video)
     file_name = file_name[:file_name.rfind(".")]
 
-    if args.online_mode:
+    if to_online_model:
         file_name += "-online"
     if args.prob_threshold:
         file_name += "-thres_{:.2f}".format(args.prob_threshold)
@@ -329,13 +293,19 @@ def main(args):
     global categories
     with open(args.category_file, 'r') as f:
         lines = f.readlines()
-    categories = [l.strip() for l in lines]
+    categories = [line.strip() for line in lines]
+
+    to_online_model = "online" in args.model_type
 
     # load model
-    model = load_model(args.model_ckpt_path, args,
-                       online_mode=args.online_mode,
-                       online_ckpt_model=args.online_ckpt_model,
-                       params_model=not args.not_params_model,)
+    model = load_model(args.model_type,
+                       args.model_ckpt_path,
+                       len(categories),
+                       to_online_model=to_online_model,
+                       from_online_model=args.from_online_model,
+                       from_params_ckpt=args.from_params_ckpt,
+                       num_segments=args.num_segments,
+                       shift_div=args.shift_div)
     print("model loaded.")
 
     # video reader
@@ -343,6 +313,8 @@ def main(args):
         cap_input = int(args.input_video)
     except ValueError:
         cmd = "ffmpeg -i {} -q:v 6 {}".format(args.input_video, args.tmp_video)
+        if os.path.exists(args.tmp_video):
+            os.remove(args.tmp_video)
         os.system(cmd)
         cap_input = args.tmp_video
     cap = cv2.VideoCapture(cap_input)
@@ -351,7 +323,7 @@ def main(args):
     # video writer
     writer = None
     if args.output_video_dir is not None:
-        file_name = _get_output_file_name(args, ".avi")
+        file_name = _get_output_file_name(args, to_online_model, ".avi")
         fourcc = cv2.VideoWriter_fourcc(* 'XVID')
         writer = cv2.VideoWriter(
             os.path.join(args.output_video_dir, file_name),
@@ -359,12 +331,13 @@ def main(args):
             args.output_video_fps,
             (args.output_video_width, args.output_video_height),
         )
+        print(os.path.join(args.output_video_dir, file_name))
         print("video writer created.")
 
     # create result txt file
     output_file = None
     if args.output_file_dir is not None:
-        file_name = _get_output_file_name(args, ".txt")
+        file_name = _get_output_file_name(args, to_online_model, ".txt")
         output_file = open(os.path.join(args.output_file_dir, file_name), "w")
 
     # run loop
@@ -376,17 +349,9 @@ def main(args):
     # online/offline params
     imgs = None
     shift_buffer = None
-    if args.online_mode:
-        shift_buffer = [torch.zeros([1, 3, 56, 56]),
-                        torch.zeros([1, 4, 28, 28]),
-                        torch.zeros([1, 4, 28, 28]),
-                        torch.zeros([1, 8, 14, 14]),
-                        torch.zeros([1, 8, 14, 14]),
-                        torch.zeros([1, 8, 14, 14]),
-                        torch.zeros([1, 12, 14, 14]),
-                        torch.zeros([1, 12, 14, 14]),
-                        torch.zeros([1, 20, 7, 7]),
-                        torch.zeros([1, 20, 7, 7])]
+    if to_online_model:
+        buffer_shapes = model_builder.build_buffer_shapes(args.model_type)
+        shift_buffer = [torch.zeros(shape) for shape in buffer_shapes]
     else:
         imgs = []
 
@@ -403,7 +368,7 @@ def main(args):
             # get model input
             cur_img = Image.fromarray(img).convert('RGB')
             model_input = create_model_input(
-                args.online_mode, cur_img, transform,
+                to_online_model, cur_img, transform,
                 imgs=imgs, num_segments=args.num_segments,
                 shift_buffer=shift_buffer,
             )
@@ -411,8 +376,8 @@ def main(args):
                 continue
 
             # get model outputs
-            outputs = predict(args.online_mode, model_input, model, args)
-            if args.online_mode:
+            outputs = predict(to_online_model, model_input, model, args)
+            if to_online_model:
                 label_id, probs, shift_buffer = outputs
             else:
                 label_id, probs = outputs

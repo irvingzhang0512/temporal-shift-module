@@ -103,7 +103,7 @@ class InvertedResidualWithShift(nn.Module):
 
 class MobileNetV2(nn.Module):
     def __init__(self,
-                 n_class=1000,
+                 num_classes=1000,
                  input_size=224,
                  width_mult=1.,
                  shift_div=8):
@@ -158,7 +158,7 @@ class MobileNetV2(nn.Module):
         self.features = nn.ModuleList(self.features)
 
         # building classifier
-        self.classifier = nn.Linear(self.last_channel, n_class)
+        self.classifier = nn.Linear(self.last_channel, num_classes)
 
         self._initialize_weights()
 
