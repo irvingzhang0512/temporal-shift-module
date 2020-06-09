@@ -16,12 +16,13 @@ parser.add_argument('--logs_name', type=str, default="default")
 parser.add_argument('--save_total_model', action="store_true")
 
 
-# ======================== Sampler Configs =========================
+# ======================== Dataset Configs =========================
 parser.add_argument('--use_weighted_sampler', action="store_true")
 parser.add_argument('--category_weights', type=list,
                     default=[.3, .3, .1, .1, .1, .1])
 parser.add_argument('--steps_per_epoch', type=int, default=300,
                     help="only useful when using weighted sampler.")
+parser.add_argument('--use-color-jitter', action="store_true", default=False)
 
 
 # ========================= Model Configs ==========================

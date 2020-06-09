@@ -9,7 +9,8 @@ import torchvision
 from torch import nn
 from torch.nn.init import constant_, normal_
 
-from ..dataset.transforms import GroupMultiScaleCrop, GroupRandomHorizontalFlip
+from ..dataset.transforms import (GroupColorJitter, GroupMultiScaleCrop,
+                                  GroupRandomHorizontalFlip)
 from .basic_ops import ConsensusModule
 
 
@@ -17,7 +18,7 @@ class TSN(nn.Module):
     def __init__(self,
                  num_classes=27, num_segments=8, modality='RGB',
                  base_model='mobilenetv2', new_length=None,
-                 consensus_type='avg', before_softmax=False,
+                 consensus_type='avg', before_softmax=True,
                  crop_num=1, partial_bn=False, img_feature_dim=256,
                  print_spec=True, pretrain='imagenet', dropout=0.5,
                  is_shift=True, shift_div=8, shift_place='blockres',
@@ -449,19 +450,22 @@ class TSN(nn.Module):
     def scale_size(self):
         return self.input_size * 256 // 224
 
-    def get_augmentation(self, flip=True):
+    def get_augmentation(self, flip=True, color_jitter=True):
+        groups = []
         if self.modality == 'RGB':
             if flip:
-                return torchvision.transforms.Compose(
-                    [GroupMultiScaleCrop(self.input_size, [1, .875, .75, .66]),
-                     GroupRandomHorizontalFlip(is_flow=False)])
-            else:
-                print('#' * 20, 'NO FLIP!!!')
-                return torchvision.transforms.Compose([
+                groups.extend([
                     GroupMultiScaleCrop(self.input_size,
                                         [1, .875, .75, .66],
-                                        fix_crop=False,)
+                                        fix_crop=False),
+                    GroupRandomHorizontalFlip(is_flow=False)
                 ])
+            else:
+                groups.append(GroupMultiScaleCrop(
+                    self.input_size, [1, .875, .75, .66], fix_crop=False,
+                ))
+            if color_jitter:
+                groups.append(GroupColorJitter(True))
         elif self.modality == 'Flow':
             return torchvision.transforms.Compose(
                 [GroupMultiScaleCrop(self.input_size, [1, .875, .75]),
@@ -470,3 +474,4 @@ class TSN(nn.Module):
             return torchvision.transforms.Compose(
                 [GroupMultiScaleCrop(self.input_size, [1, .875, .75]),
                  GroupRandomHorizontalFlip(is_flow=False)])
+        return torchvision.transforms.Compose(groups)

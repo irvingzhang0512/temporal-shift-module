@@ -1,28 +1,25 @@
+from tsm.utils.opts_utils import parser
+from tsm.utils.metrics_utils import AverageMeter, accuracy
+from tsm.models.temporal_shift import make_temporal_pool
+from tsm.models import TSN
+from tsm.dataset.transforms import (GroupCenterCrop, GroupNormalize,
+                                    GroupScale, IdentityTransform, Stack,
+                                    ToTorchFormatTensor)
+from tsm.dataset.weighted_sampler import get_weighted_sampler
+from tsm.dataset import TSNDataSet, dataset_config
+from torch.nn.utils import clip_grad_norm_
+from tensorboardX import SummaryWriter
+import torchvision
+import torch.optim
+import torch.nn.parallel
+import torch.backends.cudnn as cudnn
+import torch
+import numpy as np
 import os
 import shutil
 import sys
 import time
 sys.path.append("/ssd4/zhangyiyang/temporal-shift-module")
-
-import numpy as np
-import torch
-import torch.backends.cudnn as cudnn
-import torch.nn.parallel
-import torch.optim
-import torchvision
-from tensorboardX import SummaryWriter
-from torch.nn.utils import clip_grad_norm_
-
-from tsm.dataset import TSNDataSet, dataset_config
-from tsm.dataset.weighted_sampler import get_weighted_sampler
-from tsm.dataset.transforms import (GroupCenterCrop, GroupNormalize,
-                                    GroupScale, IdentityTransform, Stack,
-                                    ToTorchFormatTensor)
-from tsm.models import TSN
-from tsm.models.temporal_shift import make_temporal_pool
-from tsm.utils.metrics_utils import AverageMeter, accuracy
-from tsm.utils.opts_utils import parser
-
 
 
 best_prec1 = 0
@@ -100,7 +97,8 @@ def main():
         flip = False
     else:
         flip = True
-    train_augmentation = model.get_augmentation(flip=flip)
+    train_augmentation = model.get_augmentation(
+        flip=flip, color_jitter=args.use_color_jitter)
 
     # set parallel model
     model = torch.nn.DataParallel(model).cuda()
