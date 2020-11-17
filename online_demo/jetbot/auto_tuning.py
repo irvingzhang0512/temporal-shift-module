@@ -28,7 +28,7 @@ def _parse_args():
     parser.add_argument("--model-type", type=str, default="mobilenetv2_online",
                         help="[mobilenetv2_online, resnet50_online]")
     parser.add_argument("--ckpt-path", type=str,
-                        default='./mobilenetv2-online-segments8-shift8.pth.tar')
+                        default=None)
     parser.add_argument("--num-classes", type=int, default=6)
 
     # envs

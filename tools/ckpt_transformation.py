@@ -8,9 +8,9 @@ def _parse_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--from-ckpt-path", type=str,
-                        default="/hdd02/zhangyiyang/temporal-shift-module/checkpoint/TSM_ar_RGB_mobilenetv2_shift8_blockres_avg_segment8_e50_5_9_dataset/ckpt.best.pth.tar")
+                        default="/hdd02/zhangyiyang/temporal-shift-module/checkpoint/TSM_ar_RGB_mobilenetv2_shift8_blockres_avg_segment8_e30_0608_generate_200_crop_reisze_bz64/best.pth.tar")
     parser.add_argument("--to-ckpt-path", type=str,
-                        default="./online_demo/jetbot/mobilenetv2-online-segments8-shift8.pth.tar")
+                        default="./no_generate.pth.tar")
     parser.add_argument("--backbone", type=str, default="mobilenetv2",
                         help="should be one of AVAILABLE_BACKBONES")
     parser.add_argument("--from-params-ckpt",

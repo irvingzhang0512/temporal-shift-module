@@ -46,11 +46,11 @@ python tools/main.py jester RGB \
 
 # Jester mobilenet v2
 python tools/main.py jester RGB \
-    --arch mobilenetv2 --num_segments 16 --consensus_type=avg \
+    --arch mobilenetv2 --num_segments 8 --consensus_type=avg \
     --gd 20 --lr 0.02 --wd 1e-4 --lr_steps 20 40 --epochs 50 \
     --batch-size 128 -j 16 --dropout 0.5 --eval-freq=1 \
     --shift --shift_div=8 --shift_place=blockres --npb \
-    --logs_name default \
+    --logs_name color_jitter --use-color-jitter \
     --gpu_devices 0,1,2,3
 
 ```
@@ -71,13 +71,13 @@ python tools/main.py jester RGB \
 ```shell
 # AR mobilenet v2 training
 python tools/main.py ar RGB \
-    --arch mobilenetv2 --num_segments 16 \
-    --gd 20 --wd 1e-4 --lr_steps 15 30 --epochs 50 \
+    --arch mobilenetv2 --num_segments 8 --shift_div=8 \
+    --gd 20 --wd 1e-4 --lr_steps 10 20 --epochs 30 \
     -j 16 --dropout 0.5 --eval-freq=1 --consensus_type=avg \
-    --shift --shift_div=4 --shift_place=blockres --npb \
-    --logs_name 5_9_dataset \
-    --use_weighted_sampler --steps_per_epoch 200 --batch-size 32 --lr 0.005 \
-    --gpu_devices 0,1
+    --shift --shift_place=blockres --npb --use-color-jitter \
+    --logs_name 0608_generate_200_crop_reisze_bz64 --steps_per_epoch 200 \
+    --use_weighted_sampler --batch-size 64 --lr 0.01 \
+    --gpu_devices 2
 
 # AR resnet50 training
 python tools/main.py ar RGB \

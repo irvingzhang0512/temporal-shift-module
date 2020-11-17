@@ -1,26 +1,26 @@
-from tsm.utils.opts_utils import parser
-from tsm.utils.metrics_utils import AverageMeter, accuracy
-from tsm.models.temporal_shift import make_temporal_pool
-from tsm.models import TSN
+import os
+import shutil
+import time
+
+import numpy as np
+import torch
+import torch.backends.cudnn as cudnn
+import torch.nn.parallel
+import torch.optim
+import torchvision
+from tensorboardX import SummaryWriter
+from torch.nn.utils import clip_grad_norm_
+
+from tsm.dataset import TSNDataSet, dataset_config
 from tsm.dataset.transforms import (GroupCenterCrop, GroupNormalize,
                                     GroupScale, IdentityTransform, Stack,
                                     ToTorchFormatTensor)
 from tsm.dataset.weighted_sampler import get_weighted_sampler
-from tsm.dataset import TSNDataSet, dataset_config
-from torch.nn.utils import clip_grad_norm_
-from tensorboardX import SummaryWriter
-import torchvision
-import torch.optim
-import torch.nn.parallel
-import torch.backends.cudnn as cudnn
-import torch
-import numpy as np
-import os
-import shutil
-import sys
-import time
-sys.path.append("/ssd4/zhangyiyang/temporal-shift-module")
-
+from tsm.models import TSN
+from tsm.models.temporal_shift import make_temporal_pool
+from tsm.utils.metrics_utils import AverageMeter, accuracy
+from tsm.utils.opts_utils import parser
+from tsm.utils.ckpt_convert_utils import convert_state_dict
 
 best_prec1 = 0
 
@@ -28,14 +28,15 @@ best_prec1 = 0
 def _get_store_name(args):
     full_arch_name = args.arch
     if args.shift:
-        full_arch_name += '_shift{}_{}'.format(
-            args.shift_div, args.shift_place)
+        full_arch_name += '_shift{}_{}'.format(args.shift_div,
+                                               args.shift_place)
     if args.temporal_pool:
         full_arch_name += '_tpool'
-    args.store_name = '_'.join(
-        ['TSM', args.dataset, args.modality, full_arch_name,
-         args.consensus_type, 'segment%d' % args.num_segments,
-         'e{}'.format(args.epochs)])
+    args.store_name = '_'.join([
+        'TSM', args.dataset, args.modality, full_arch_name,
+        args.consensus_type,
+        'segment%d' % args.num_segments, 'e{}'.format(args.epochs)
+    ])
     if args.pretrain != 'imagenet':
         args.store_name += '_{}'.format(args.pretrain)
     if args.lr_type != 'step':
@@ -68,14 +69,17 @@ def main():
 
     # create model
     model = TSN(
-        num_classes, args.num_segments, args.modality,
+        num_classes,
+        args.num_segments,
+        args.modality,
         base_model=args.arch,
         consensus_type=args.consensus_type,
         dropout=args.dropout,
         img_feature_dim=args.img_feature_dim,
         partial_bn=not args.no_partialbn,
         pretrain=args.pretrain,
-        is_shift=args.shift, shift_div=args.shift_div,
+        is_shift=args.shift,
+        shift_div=args.shift_div,
         shift_place=args.shift_place,
         fc_lr5=not (args.tune_from and args.dataset in args.tune_from),
         temporal_pool=args.temporal_pool,
@@ -122,8 +126,8 @@ def main():
             best_prec1 = checkpoint['best_prec1']
             model.load_state_dict(checkpoint['state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer'])
-            print(("=> loaded checkpoint '{}' (epoch {})"
-                   .format(args.evaluate, checkpoint['epoch'])))
+            print(("=> loaded checkpoint '{}' (epoch {})".format(
+                args.evaluate, checkpoint['epoch'])))
         else:
             print(("=> no checkpoint found at '{}'".format(args.resume)))
 
@@ -178,49 +182,52 @@ def main():
             num_classes,
             args.category_weights,
             train_file_path=args.train_list,
-            num_samples=args.batch_size*args.steps_per_epoch,
+            num_samples=args.batch_size * args.steps_per_epoch,
             replacement=True,
         )
     train_loader = torch.utils.data.DataLoader(
         TSNDataSet(
-            args.root_path, args.train_list,
+            args.root_path,
+            args.train_list,
             num_segments=args.num_segments,
             new_length=data_length,
             modality=args.modality,
             image_tmpl=prefix,
             transform=torchvision.transforms.Compose([
                 train_augmentation,
-                Stack(
-                    roll=(args.arch in ['BNInception', 'InceptionV3'])),
+                Stack(roll=(args.arch in ['BNInception', 'InceptionV3'])),
                 ToTorchFormatTensor(
                     div=(args.arch not in ['BNInception', 'InceptionV3'])),
                 normalize,
-            ]), dense_sample=args.dense_sample),
+            ]),
+            dense_sample=args.dense_sample),
         batch_size=args.batch_size,
         sampler=sampler,
         shuffle=not args.use_weighted_sampler,
         num_workers=args.workers,
         pin_memory=True,
         drop_last=True)  # prevent something not % n_GPU
-    val_loader = torch.utils.data.DataLoader(
-        TSNDataSet(
-            args.root_path, args.val_list,
-            num_segments=args.num_segments,
-            new_length=data_length,
-            modality=args.modality,
-            image_tmpl=prefix,
-            random_shift=False,
-            transform=torchvision.transforms.Compose([
-                GroupScale(int(scale_size)),
-                GroupCenterCrop(crop_size),
-                Stack(
-                    roll=(args.arch in ['BNInception', 'InceptionV3'])),
-                ToTorchFormatTensor(
-                    div=(args.arch not in ['BNInception', 'InceptionV3'])),
-                normalize,
-            ]), dense_sample=args.dense_sample),
-        batch_size=args.batch_size, shuffle=False,
-        num_workers=args.workers, pin_memory=True)
+    val_loader = torch.utils.data.DataLoader(TSNDataSet(
+        args.root_path,
+        args.val_list,
+        num_segments=args.num_segments,
+        new_length=data_length,
+        modality=args.modality,
+        image_tmpl=prefix,
+        random_shift=False,
+        transform=torchvision.transforms.Compose([
+            GroupScale(int(scale_size)),
+            GroupCenterCrop(crop_size),
+            Stack(roll=(args.arch in ['BNInception', 'InceptionV3'])),
+            ToTorchFormatTensor(
+                div=(args.arch not in ['BNInception', 'InceptionV3'])),
+            normalize,
+        ]),
+        dense_sample=args.dense_sample),
+                                             batch_size=args.batch_size,
+                                             shuffle=False,
+                                             num_workers=args.workers,
+                                             pin_memory=True)
 
     # define loss function (criterion) and optimizer
     if args.loss_type == 'nll':
@@ -230,15 +237,15 @@ def main():
 
     for group in policies:
         print(('group: {} has {} params, lr_mult: {}, decay_mult: {}'.format(
-            group['name'], len(group['params']),
-            group['lr_mult'], group['decay_mult'])))
+            group['name'], len(group['params']), group['lr_mult'],
+            group['decay_mult'])))
 
     if args.evaluate:
         validate(val_loader, model, criterion, 0)
         return
 
-    log_training = open(os.path.join(
-        args.root_log, args.store_name, 'log.csv'), 'w')
+    log_training = open(
+        os.path.join(args.root_log, args.store_name, 'log.csv'), 'w')
     with open(os.path.join(args.root_log, args.store_name, 'args.txt'),
               'w') as f:
         f.write(str(args))
@@ -248,13 +255,13 @@ def main():
         adjust_learning_rate(optimizer, epoch, args.lr_type, args.lr_steps)
 
         # train for one epoch
-        train(train_loader, model, criterion,
-              optimizer, epoch, log_training, tf_writer)
+        train(train_loader, model, criterion, optimizer, epoch, log_training,
+              tf_writer)
 
         # evaluate on validation set
         if (epoch + 1) % args.eval_freq == 0 or epoch == args.epochs - 1:
-            prec1 = validate(val_loader, model, criterion,
-                             epoch, log_training, tf_writer)
+            prec1 = validate(val_loader, model, criterion, epoch, log_training,
+                             tf_writer)
 
             # remember best prec@1 and save checkpoint
             is_best = prec1 > best_prec1
@@ -266,13 +273,14 @@ def main():
             log_training.write(output_best + '\n')
             log_training.flush()
 
-            save_checkpoint({
-                'epoch': epoch + 1,
-                'arch': args.arch,
-                'state_dict': model.state_dict(),
-                'optimizer': optimizer.state_dict(),
-                'best_prec1': best_prec1,
-            }, is_best, model, not args.save_total_model)
+            save_checkpoint(
+                {
+                    'epoch': epoch + 1,
+                    'arch': args.arch,
+                    'state_dict': model.state_dict(),
+                    'optimizer': optimizer.state_dict(),
+                    'best_prec1': best_prec1,
+                }, is_best, model, not args.save_total_model)
 
 
 def train(train_loader, model, criterion, optimizer, epoch, log, tf_writer):
@@ -313,8 +321,8 @@ def train(train_loader, model, criterion, optimizer, epoch, log, tf_writer):
         loss.backward()
 
         if args.clip_gradient is not None:
-            total_norm = clip_grad_norm_(
-                model.parameters(), args.clip_gradient)
+            total_norm = clip_grad_norm_(model.parameters(),
+                                         args.clip_gradient)
 
         optimizer.step()
         optimizer.zero_grad()
@@ -330,9 +338,14 @@ def train(train_loader, model, criterion, optimizer, epoch, log, tf_writer):
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                       'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
                       'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
-                          epoch, i, len(train_loader), batch_time=batch_time,
-                          data_time=data_time, loss=losses,
-                          top1=top1, top5=top5,
+                          epoch,
+                          i,
+                          len(train_loader),
+                          batch_time=batch_time,
+                          data_time=data_time,
+                          loss=losses,
+                          top1=top1,
+                          top5=top5,
                           lr=optimizer.param_groups[-1]['lr'] * 0.1))  # TODO
             print(output)
             log.write(output + '\n')
@@ -379,7 +392,8 @@ def validate(val_loader, model, criterion, epoch, log=None, tf_writer=None):
                           'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                           'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
                           'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
-                              i, len(val_loader),
+                              i,
+                              len(val_loader),
                               batch_time=batch_time,
                               loss=losses,
                               top1=top1,
@@ -390,8 +404,9 @@ def validate(val_loader, model, criterion, epoch, log=None, tf_writer=None):
                     log.flush()
 
     output = ('Testing Results: Prec@1 {top1.avg:.3f} '
-              'Prec@5 {top5.avg:.3f} Loss {loss.avg:.5f}'
-              .format(top1=top1, top5=top5, loss=losses))
+              'Prec@5 {top5.avg:.3f} Loss {loss.avg:.5f}'.format(top1=top1,
+                                                                 top5=top5,
+                                                                 loss=losses))
     print(output)
     if log is not None:
         log.write(output + '\n')
@@ -405,20 +420,38 @@ def validate(val_loader, model, criterion, epoch, log=None, tf_writer=None):
     return top1.avg
 
 
-def save_checkpoint(state, is_best, model, save_params=True):
-    filename = '%s/%s/ckpt.pth.tar' % (args.root_model, args.store_name)
+def save_checkpoint(state,
+                    is_best,
+                    model,
+                    save_params=True,
+                    step_ckpt_name='ckpt.pth.tar',
+                    best_ckpt_name='best.pth.tar',
+                    online_ckpt_name='online.pth.tar'):
+    filename = '%s/%s/%s' % (args.root_model, args.store_name, step_ckpt_name)
     if save_params:
         torch.save(state, filename)
     else:
         torch.save(model, filename)
     if is_best:
-        shutil.copyfile(filename, filename.replace('pth.tar', 'best.pth.tar'))
+        shutil.copyfile(filename,
+                        filename.replace(step_ckpt_name, best_ckpt_name))
+        src_dict = torch.load(filename)
+        target_dict = convert_state_dict(
+            src_dict,
+            backbone=args.arch,
+            from_online_ckpt=False,
+            to_online_ckpt=True,
+            from_params_ckpt=True,
+        )
+        torch.save(
+            target_dict,
+            '%s/%s/%s' % (args.root_model, args.store_name, online_ckpt_name))
 
 
 def adjust_learning_rate(optimizer, epoch, lr_type, lr_steps):
     """Sets the lr to the initial LR decayed by 10 every 30 epochs"""
     if lr_type == 'step':
-        decay = 0.1 ** (sum(epoch >= np.array(lr_steps)))
+        decay = 0.1**(sum(epoch >= np.array(lr_steps)))
         lr = args.lr * decay
         decay = args.weight_decay
     elif lr_type == 'cos':
@@ -434,9 +467,11 @@ def adjust_learning_rate(optimizer, epoch, lr_type, lr_steps):
 
 def check_rootfolders():
     """Create log and model folder"""
-    folders_util = [args.root_log, args.root_model,
-                    os.path.join(args.root_log, args.store_name),
-                    os.path.join(args.root_model, args.store_name)]
+    folders_util = [
+        args.root_log, args.root_model,
+        os.path.join(args.root_log, args.store_name),
+        os.path.join(args.root_model, args.store_name)
+    ]
     for folder in folders_util:
         if not os.path.exists(folder):
             print('creating folder ' + folder)
